@@ -5,10 +5,10 @@ layout: nil
 <feed xmlns="http://www.w3.org/2005/Atom">
   
   <title>Joan Arnaldich Homepage</title>
-  <link href="http://jarnaldich.net/feed.xml" rel="self"/>
-  <link href="http://jarnaldich.net/"/>
+  <link href="http://jarnaldich.me/feed.xml" rel="self"/>
+  <link href="http://jarnaldich.me/"/>
   <updated>{{ site.time | date_to_xmlschema }}</updated>
-  <id>http://www.jarnaldich.net/</id>
+  <id>http://www.jarnaldich.me/</id>
   <author>
     <name>Joan Arnaldich</name>
     <email>jarnaldich@google.com</email>
@@ -17,9 +17,9 @@ layout: nil
   {% for post in site.posts %}
   <entry>
     <title>{{ post.title }}</title>
-    <link href="http://jarnaldich.net{{ post.url }}"/>
+    <link href="http://jarnaldich.me{{ post.url }}"/>
     <updated>{{ post.date | date_to_xmlschema }}</updated>
-    <id>http://jarnaldich.net{{ post.id }}</id>
+    <id>http://jarnaldich.me{{ post.id }}</id>
     <content type="html">{{ post.content | xml_escape }}</content>
   </entry>
   {% endfor %}
