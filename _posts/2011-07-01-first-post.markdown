@@ -43,36 +43,44 @@ DYNAMIC + A WHOLE LOT OF CACHING = STATIC
 
 The other, probably most relevant, difference from the 90s is the
 mashups culture. Your web app can rely on third party services for its
-dynamic parts. Even if you are able to serve dynamic content, it still
-interesting to use some of those services.
+dynamic parts. (IMHO, Even if you are able to serve dynamic content,
+it's still interesting to use some of those services).
 
 Now that you know the _whys_, let's talk about the _hows_.
 
 ## Jekyll
 There are several static page generators out there (just Google for
-them). I feel confident with Ruby, but what finally decided me was the
-fact that [Github Pages](http://pages.github.com/) work seamlessly
-with [Jekyll](http://jekyllrb.com/) (no suprise: jekyll's author is
-one of the Github founders).
+them). I feel confident with Ruby, but the key point here was
+[Github Pages](http://pages.github.com/) having automatic
+[Jekyll](http://jekyllrb.com/) processing (no suprise: jekyll's author is
+one of the Github founders). 
 
 I must admit I am curious about [Hakyll](http://jaspervdj.be/hakyll/)
-too... especially because you do not need third party tools for syntax
-highlighting.
+too... 
 
-With jekyll, you can get:
+With jekyll, you get:
 
 - A full templating system based on markup authoring run through
   [liquid](http://www.liquidmarkup.org/)-powered templates.
 - Syntax highlighting (through) pygments. Just install it and run with
   the `--pygments` option.
 - Tagging (not directly, but easy to add).
-- A way to host your blog at no cost, provided your content is open-sourced.
+- A content-based related posts feature.
 
 Plus, of course, the possibility to store your blog at GitHub.
 
 ## Comments system
+
 There are some good reasons for using a third party comment system
 instead of your own (security, merging different sources,
 statistics...), even if you can serve dynamic content. For this blog I
 chose [disqus](http://disqus.com/), but there are others...
+
+## Github
+
+Both the content and the templates for this blog are hosted at a
+Github free account, which will even let you redirect your domain.
+You can check the source code, fork the repo or whatever
+[here](https://github.com/jarnaldich/jarnaldich.github.com).
+
 
