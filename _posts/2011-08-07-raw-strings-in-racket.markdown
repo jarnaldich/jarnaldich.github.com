@@ -296,5 +296,6 @@ not that useful) language in Racket.
 
 Check out [This other
 article](http://matt.might.net/articles/implementing-a-programming-language/)
-to see how to develop a language by only affecting the expander layer
-(that is, with macros, so that the language is still made up of s-expressions).
+to see how to develop an interpreter for two small languages, but
+without using Racket's language extension mechanisms (evaluation is
+performed at run-time, through an eval function).
