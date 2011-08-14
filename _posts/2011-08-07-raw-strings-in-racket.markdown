@@ -294,3 +294,7 @@ Check out [This article](http://hashcollision.org/brainfudge/) for a
 more complete example on how to design a Turing-complete (but maybe
 not that useful) language in Racket.
 
+Check out [This other
+article](http://matt.might.net/articles/implementing-a-programming-language/)
+to see how to develop a language by only affecting the expander layer
+(that is, with macros, so that the language is still made up of s-expressions).
