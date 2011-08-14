@@ -11,6 +11,13 @@ string syntax. I this article I explain how easy it is for such a
 feature to be implemented in Racket thanks to the language's ability
 to extend its own syntax.  
 
+__2011-08-14 UPDATE:__ This article can be used as a tutorial for
+implementing readtable extensions to Racket. If you just want the
+functionality, you can achieve it with the ``at-exp`` language,
+already included in Racket's distribution. Just
+skip to the <a href="#at-exp">at-exp</a> section at the end of this
+tutorial to see how.
+
 # The problem
 
 This will probably sound familiar to any of you using windows paths or
@@ -214,6 +221,59 @@ underlying language from the input stream.
 - The ``#:wrapper2`` callback will parameterize both ``read`` and
 ``read-syntax`` with the quote-character enhanced readtable.  Note
 that the quoting char is also read from the input stream first.
+
+<a name="at-exp" > </a>
+# UPDATE: The ``at-exp`` language 
+
+After posting a link to this tutorial to the ``users@racket-lang.org``
+mailing list (a very active and helpful list for Racket users), Eli
+Barzilay (one of Racket's core developers) pointed out that the
+[at-exp](http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp)
+language could be used to achieve the same results. This language acts
+at the reader level and was originally developed for [scribble](http://docs.racket-lang.org/scribble/index.html?q=scribble)
+ (a family of languages for writing textual content, such as
+racket's documentation itself).
+
+Basically, ``at-exp`` extends another language (passed in as a
+parameter, like the one in this tutorial), so that expressions
+of the form:
+
+{% highlight scheme %}
+@func{Text here}
+{% endhighlight %}
+
+make it to the expansion layer like
+
+{% highlight scheme %}
+(func "Text here")
+{% endhighlight %}
+
+Where text is read literally (no backslash substitution). So here's a
+way to achieve the same functionality we expected just by what's
+already provided by Racket:
+
+{% highlight scheme %}
+#lang at-exp racket
+(define r string-append)
+(display @r{...nearly free text here...})
+{% endhighlight %}
+
+When using __DrRacket__, you can press the _Macro Stepper_ button to
+see how the above is read:
+
+{% highlight scheme %}
+(module anonymous-module racket
+  (#%module-begin
+   (define r string-append)
+   (display (r "...nearly free text here..."))))
+{% endhighlight %}
+
+Of course, the ``r`` is there just to make the syntax shorter... you
+could just use ``string-append`` each time. There is also another way
+to pass parameters to the ``@`` functions, which is not relevant here,
+through ``[]``. Check the
+[docs](http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp)
+for the details.
 
 # Conclusions
 
