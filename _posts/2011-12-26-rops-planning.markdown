@@ -5,7 +5,7 @@ tags: scheme rops
 ---
 
 In my [previous post](/2011/12/23/scheme-as-a-rite-of-passage.html), I
-stated I was going to build yet another toy scheme implementation.
+stated I was going to build yet another toy Scheme implementation.
 Despite I still do not know every detail of it yet, I do have a
 general idea of where I want to go, so I will try to sketch and
 motivate my plan in this post. These are the main points:
@@ -34,9 +34,9 @@ interpreter in a garbage-collected language, you can easily avoid
 writing your own garbage collector: you just need to think of a proper
 mapping between the objects in scheme and the data structures managed
 by the host language. This technique is known as _snarfing_ and is of
-course limited by the number of helpful features offered by your host
-language. Some of the things that make implementing a Scheme easier
-are:
+course limited by the number of helpful features offered by your
+language of choice. Some of the things that make implementing a Scheme
+easier are:
 
 - First class closures.
 - Tail-call optimization.
@@ -49,7 +49,7 @@ language provides. On the lower end there is assembly (or C), with
 none of the above, which would force an explicit implementation of
 everything. On the other end of the line there is Scheme itself, which
 would lead us to the so-called _meta-circular_ implementation. Most
-high level languages lie somewhere inbetween those two limits.
+high level languages lie somewhere in-between those two limits.
 
 One of the most important decisions to make when implementing a Scheme
 interpreter is, then, what language to use and how much to snarf from
