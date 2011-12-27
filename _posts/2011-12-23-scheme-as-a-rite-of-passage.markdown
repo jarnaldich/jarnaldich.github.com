@@ -97,6 +97,9 @@ The above cover interpreters. If you are interested in implementing a compiler t
 
 Other resources:
 
+- Peter Michaux 
+  [blogged about](http://michaux.ca/articles/scheme-from-scratch-introduction)
+  his own rite of passage.
 - This [Reddit thread](http://www.reddit.com/r/scheme/comments/fvbjr/question_which_scheme_implementation_has_a_better/) on easy-to-understand implementations.
 - The [ReadScheme](http://readscheme.org/) papers. It's probably easy to get lost here unless you are a researcher...
 - And, of course, the [Schemers](http://www.schemers.org) website.
