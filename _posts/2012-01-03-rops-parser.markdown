@@ -99,8 +99,40 @@ details.
 The repl
 ========
 
-Once we have the code for the three layers, we can write the function
-that ties it all 
+Once we have the code for the three layers, we can write the code
+that ties them all together. Our main will just input buffer for the
+lexer and call the repl. It will also catch the `Eof` exception thrown
+by the lexer so it aborts without generating an "empty token" error.
+
+{% highlight ocaml %}
+let _ =
+  try
+    let lexbuf = Lexing.from_channel stdin in
+    lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = "stdin" };
+    repl lexbuf
+  with
+    Lexer.Eof ->
+      flush stdout;
+      exit 0
+{% endhighlight %}
+
+The the interesting code is in the `repl` function:
+
+{% highlight ocaml %}
+let rec repl lexbuf =
+  print_prompt ();
+  (try
+     print_obj (Evaluator.eval (Parser.sexp Lexer.token lexbuf))
+   with
+    | SchemeLexerError (s, pos) ->
+      Format.printf "Error in %s at line %d, char %d: %s@." pos.pos_fname pos.pos_lnum pos.pos_cnum s;
+    | SchemeEvalError (s) -> Format.printf "Evaluation Error: %s@." s);
+  repl lexbuf;;
+{% endhighlight %}
+
+Here you can see how we simply thread the results of the tree layers
+(print_obj just calls the `Printer` module with the needed formatter).
+The rest is just exception handling.
 
 Final thougths
 ==============
@@ -124,8 +156,6 @@ sub-parsers. Take a look at IronScheme's
 and
 [parser](https://github.com/leppie/IronScheme/blob/master/IronScheme/IronScheme/Compiler/IronScheme.y)
 for a real-world example of a parser for a Scheme language.
-
-
 
 Resources
 =========
