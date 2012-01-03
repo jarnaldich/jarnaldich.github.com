@@ -7,7 +7,7 @@ tags: rops parser
 In the previous post we learned how to do lexical analysis for our toy
 language using `ocamllex`. Remember that the result of that step is a
 "cleaner" input stream (ie, only with meaningful information, in bits
-called tokens). It is the task of the parser to give some sort of
+called _tokens_). It is the task of the parser to give some sort of
 structure to that stream. Since we are dealing with a lisp-like
 language, that structure will be a representation of symbolic
 expressions using OCaml data types.
@@ -17,7 +17,7 @@ The Parser
 
 All `yacc/bison`-style parsers work more or less the same: the grammar
 is specified in a _BNF_-like language, with a set of _rules_ and
-the callback code to execute each time the parser accepts a rule.
+the callback code to execute each time the parser accepts a production.
 Apart from the grammar itself, there's also a _header section_ with
 extra information for the code-generation step. In our case, this
 generation step will turn `.mly` grammar description files into `.ml/.mli`
@@ -26,7 +26,7 @@ ocaml source/header files.
 The entry point in our grammar is the symbolic expression production,
 which will generate a value of type `scheme_obj` we can later feed to
 the evaluator (See [this previous post](/2011/12/30/rops-pncalc.html)
-for an explanation of the `scheme_obj` type). We tell `ocamllex` about
+for an explanation on the `scheme_obj` type). We tell `ocamlyacc` about
 this in the following header line:
 
 {% highlight ocaml %}
@@ -47,8 +47,8 @@ sexp
 
 The above should be almost self-evident: a symbolic expression is
 either a list or an atom of some basic type. For a basic type, the
-right `scheme_obj` constructor is called. The list is a recursive data
-type delegated to the following production:
+right `scheme_obj` constructor is called. The `list` is a recursive
+production:
 
 {% highlight ocaml %}
 list
@@ -60,11 +60,10 @@ list
 {% endhighlight %}
 
 These four definitions handle the simple/dotted and paren/bracket
-options. Note that a parens and brackets cannot be mixed in the same
-sexp. Note also that non-dotted lists may be empty, while dotted ones
-must have non-empty _car_ and _cdr_ fields. You may have noticed that
-the actual construction of the list is delegated to another
-production:
+cases. Note that parens and brackets cannot be mixed in the same
+sexp. Also note that non-dotted lists may be empty, while dotted ones
+must have non-empty _car_ and _cdr_ fields. The `exprlist` rule above
+will accept possibly empty `sexp` sequences:
 
 {% highlight ocaml %}
 exprlist
@@ -74,15 +73,15 @@ exprlist
 {% endhighlight %}
 
 Note that, in this production, the _exprlist_ appears to the left of
-the _sexp_, this is the preferred way for a LALR parser. Since the
+the _sexp_; this is the preferred way for a LALR parser. Since the
 accumulator will actually _prepend_ each sexp to the previous list,
 the results must be reversed at the end (That's what the `List.rev`
 calls are for in the `list` production).
 
-There's really not much to it. Using `ocamllex` for such a simple
+There's really not much to it. Using `ocamlyacc` for such a simple
 grammar may seem overkill, but bear in mind that there's a lot of
 scheme we haven't covered at all (think of quoting and quasi-quoting,
-for example). `ocamllex` really doesn't add that much complexity and
+for example). `ocamlyacc` really doesn't add that much complexity and
 yet would make future additions easier.
 
 The printer
@@ -93,16 +92,15 @@ the result of an evaluation back to the user. At the moment, the
 printer will just have a `write` function. Its output should be such
 that, if `read` again, the value is `equal?` to the output. The code
 is probably too boring to go over it here in detail. Just check the
-[repo](https://github.com/jarnaldich/rops/tree/v1-rpn-calc) for
-details.
+[repo](https://github.com/jarnaldich/rops/tree/v1-rpn-calc).
 
 The repl
 ========
 
-Once we have the code for the three layers, we can write the code
-that ties them all together. Our main will just input buffer for the
-lexer and call the repl. It will also catch the `Eof` exception thrown
-by the lexer so it aborts without generating an "empty token" error.
+Once we have the three layers complete, we can write the code that
+ties them all together. Our main will just input buffer for the lexer
+and call the repl. It will also catch the `Eof` exception thrown by
+the lexer so it aborts without generating an "empty token" error.
 
 {% highlight ocaml %}
 let _ =
@@ -157,6 +155,15 @@ and
 [parser](https://github.com/leppie/IronScheme/blob/master/IronScheme/IronScheme/Compiler/IronScheme.y)
 for a real-world example of a parser for a Scheme language.
 
+One of the main design decisions here is how much work each layer does
+and how much work it defers to the next layer. In our case, for
+example, it would make sense to capture some basic keywords in the
+reader layer so that the evaluator doesn't need to do string
+comparison. We have chosen to keep the reader layer thin so that we
+can add all the missing features by just tweaking the evaluator
+module. This also keeps most of the significant code in one place and
+should be easier to follow.
+
 Resources
 =========
 - The
@@ -165,6 +172,4 @@ Resources
 - A gentler
   [introductory tutorial](http://plus.kaist.ac.kr/~shoh/ocaml/ocamllex-ocamlyacc/ocamlyacc-tutorial/)
   on ocamlyacc.
-
-
 
