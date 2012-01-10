@@ -136,7 +136,7 @@ to abort the whole interpreter without generating an error (that will
 make sense once we get into the repl code).
 
 Our lexer does not support Unicode. For a more modern lexer, take a
-look at the (Ulex)[http://www.cduce.org/download.html#side] library. I
+look at the [Ulex](http://www.cduce.org/download.html#side) library. I
 haven't used it here to keep the code free from external dependencies.
 
 In the next post we will learn about the rest of the _reader_ layer by
