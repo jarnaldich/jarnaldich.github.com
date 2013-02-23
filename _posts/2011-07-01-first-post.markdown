@@ -83,4 +83,16 @@ Github free account, which will even let you redirect your domain.
 You can check the source code, fork the repo or whatever
 [here](https://github.com/jarnaldich/jarnaldich.github.com).
 
+## Updates as of Feb 2013
+
+Some other tools have sprung around github pages / Jekyll. If I
+started blogging now I'd probably check them out:
+
+- [Octopress](http://octopress.org) Is built on top of Jekyll to help
+  hackers with the boring part of setting up a bloc (css, html
+  templates, etc...).
+- [Jekyll bootstrap](http://jekyllbootstrap.org) Helps setting up a
+  github pages account. There's a new project by the same author that
+  aims to be language agnostic called [ruhoh](http://ruhoh.com).
+
 
