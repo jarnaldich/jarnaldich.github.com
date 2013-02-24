@@ -13,8 +13,10 @@ your favourite features from language to language.
 Most languages just won't let you do anything about it, but then,
 happily, there is also a whole family of _programmable programming
 languages_: [Lisps](http://www.paulgraham.com/chameleon.html) being
-the most notable members among them, there are, for sure, other
-languages in other sometimes forgotten paradigms.
+the most notable members among them.
+
+But there are, for sure, other languages in other sometimes forgotten
+paradigms.
 
 ## Concatenative
 
@@ -54,7 +56,7 @@ type something like:
 r| \\Server\share| directory-files
 {% endhighlight %}
 
-Note the space after the first vertical bar. This is typical of
+Notice the space after the first vertical bar. This is typical of
 Factor, you'll see why in a moment.
 
 As a Factor newbie, there are two things you can do. One is to RTFM,
@@ -70,7 +72,7 @@ The other one is to check the implementation of something close to
 what's intended. This is extremely easy in Factor, since most of the
 Factor libraries are implemented in Factor itself and the help system
 lets you navigate through the definitions. The solution presented here
-is inspired by the regex-introducing parsing word `R/`.
+is inspired by the regex-introducing parsing word [`R/`](http://docs.factorcode.org/content/word-R__slash__,regexp.html).
 
 So it looks like we'll need to introduce a word that will hook up to a
 function whose responsibility will be to push a string into the
@@ -129,7 +131,7 @@ end of the quotation `change-lexer-column` finds the new lexer column
 at the top of the stack, and just below it lies our return value: the
 raw string.
 
-Let's try it:
+Let's give it a try:
 
 {% highlight factor %}
 IN: scratchpad r| \\Server\share|
@@ -139,12 +141,16 @@ IN: scratchpad r| \\Server\share|
 IN: scratchpad 
 {% endhighlight %}
 
-Done!
+## Conclusion
+
+Extending Factor's syntax is quite straightforward. The linked
+documentation system and source code browser are an extremely helpful
+resource to learn the language.
 
 ## Resources
 
 - Slava's post on
   [writing DSLs on Factor](http://factor-language.blogspot.com.es/2009/09/survey-of-domain-specific-languages-in.html)
   gives a nice overview of Factor's self-modifying capabilities.
-- The [docs](http://docs.factorcode.org/content/article-parsing-words.html), of course.
+- The [docs](http://docs.factorcode.org/content/article-parsing-words.html, of course.
 
