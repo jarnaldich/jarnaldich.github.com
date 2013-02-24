@@ -79,7 +79,7 @@ function whose responsibility will be to push a string into the
 accumulator. Something like:
 
 {% highlight factor %}
-SYNTAX: r| 124 parsing-raw ;
+SYNTAX: r| CHAR: | parsing-raw ;
 {% endhighlight %}
 
 This means that the parser will immediately evaluate `124 parsing-raw`
@@ -147,10 +147,22 @@ Extending Factor's syntax is quite straightforward. The linked
 documentation system and source code browser are an extremely helpful
 resource to learn the language.
 
+As pointed out after a question in the
+[mailing list](http://dir.gmane.org/gmane.comp.lang.factor.general),
+my solution lacks a way to escape characters. Check out the reference
+at the end of the article to see how Factor's "real" string parser
+deals with them.
+
 ## Resources
 
 - Slava's post on
   [writing DSLs on Factor](http://factor-language.blogspot.com.es/2009/09/survey-of-domain-specific-languages-in.html)
   gives a nice overview of Factor's self-modifying capabilities.
-- The [docs](http://docs.factorcode.org/content/article-parsing-words.html, of course.
+- The
+  [docs](http://docs.factorcode.org/content/article-parsing-words.html,
+  of course.
+- The
+  [string parser code](https://github.com/slavapestov/factor/blob/master/core/strings/parser/parser.factor),
+  to see how "real" Factor strings are parsed. Interesting to see how
+  Factor deals with escape characters. 
 
