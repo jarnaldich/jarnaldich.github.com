@@ -4,17 +4,17 @@ title: Raw Strings in Factor
 tags: Factor concatenative
 ---
 
-Ok, you may think I have a fixation with [raw
-strings](2011/08/07/raw-strings-in-racket.html). If you're like
-most developers and have used different languages through the years,
-you have probably experienced the feeling of wanting to port your
-favourite features from language to language.
+Ok, you may think I have a fixation with
+[raw strings](2011/08/07/raw-strings-in-racket.html), but if you're
+like most developers and have used different languages through the
+years, you have probably experienced the feeling of wanting to port
+your favourite features from language to language.
 
 Most languages just won't let you do anything about it, but then,
 happily, there is also a whole family of _programmable programming
-languages_: [Lisps](http://www.paulgraham.com/chameleon.html) being the
-most notable members among them, there are, for sure, other languages
-in other sometimes almost forgotten paradigms.
+languages_: [Lisps](http://www.paulgraham.com/chameleon.html) being
+the most notable members among them, there are, for sure, other
+languages in other sometimes forgotten paradigms.
 
 ## Concatenative
 
@@ -27,7 +27,7 @@ _general purpose_ (Forth is more oriented towards embedded systems)
 _practical_ (not just a theoretical tool) and _modern_: its creator
 Slava Pestov and the development team have brilliantly shown how
 object orientation, incremental compilation, and bunch of advanced
-language features can be implemented in a concatenative language.
+language features can be put to work in a concatenative language.
 
 ## Factor as a shell
 
@@ -94,9 +94,10 @@ separators someday.
 
 ## The lexer
 
-For our purpose, we cannot work at the parser level (Factor has a good
-deal of words for this), but call the lexer directly. The lexer is
-stored in a variable named `lexer`. 
+For our purpose, we cannot work at the parser level: we don't deal
+with words, numbers or already-constructed strings. If we want to
+construct a Factor string in a different way, we'll have to call the
+lexer directly. The lexer is stored in a [dynamic variable](http://docs.factorcode.org/content/article-namespaces.html) named `lexer`.
 
 {% highlight factor %}
 : parsing-raw ( accum end -- accum )
@@ -121,11 +122,12 @@ The actual parsing is done in the `take-until` word:
 
 The word `change-lexer-column` calls its quotation with the column and
 the line text of the lexer at that moment. The first line, then, just
-skips that compulsory blank after the introductory word `r|`. The next
-two lines find the positon of the terminator (`index-from`) and
-extract the string accordingly (`subseq`). At the end of the quotation
-`change-lexer-column` finds the new lexer column at the top of the
-stack, and just below it lies our return value: the raw string.
+skips that blank we talked earlier following the introductory word
+`r|`. The next two lines find the positon of the terminator
+(`index-from`) and extract the string accordingly (`subseq`). At the
+end of the quotation `change-lexer-column` finds the new lexer column
+at the top of the stack, and just below it lies our return value: the
+raw string.
 
 Let's try it:
 
@@ -144,4 +146,5 @@ Done!
 - Slava's post on
   [writing DSLs on Factor](http://factor-language.blogspot.com.es/2009/09/survey-of-domain-specific-languages-in.html)
   gives a nice overview of Factor's self-modifying capabilities.
+- The [docs](http://docs.factorcode.org/content/article-parsing-words.html), of course.
 
