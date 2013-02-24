@@ -159,7 +159,7 @@ deals with them.
   [writing DSLs on Factor](http://factor-language.blogspot.com.es/2009/09/survey-of-domain-specific-languages-in.html)
   gives a nice overview of Factor's self-modifying capabilities.
 - The
-  [docs](http://docs.factorcode.org/content/article-parsing-words.html,
+  [docs](http://docs.factorcode.org/content/article-parsing-words.html)
   of course.
 - The
   [string parser code](https://github.com/slavapestov/factor/blob/master/core/strings/parser/parser.factor),
