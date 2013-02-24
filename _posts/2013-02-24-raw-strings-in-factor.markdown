@@ -7,8 +7,8 @@ tags: Factor concatenative
 Ok, you may think I have a fixation with
 [raw strings](2011/08/07/raw-strings-in-racket.html), but if you're
 like most developers and have used different languages through the
-years, you have probably experienced the feeling of wanting to port
-your favourite features from language to language.
+years, you probably know the feeling of wanting to port your favourite
+features from language to language.
 
 Most languages just won't let you do anything about it, but then,
 happily, there is also a whole family of _programmable programming
