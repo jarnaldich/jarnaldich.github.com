@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<rss version="2.0">
+ <channel>
+  <title>My Awesome Blog: Posts tagged 'racket'</title>
+  <description>My Awesome Blog: Posts tagged 'racket'</description>
+  <link>http://www.example.com/tags/racket.html</link>
+  <lastBuildDate>Sun, 07 Aug 2011 00:00:00 CEST</lastBuildDate>
+  <pubDate>Sun, 07 Aug 2011 00:00:00 CEST</pubDate>
+  <ttl>1800</ttl>
+  <item>
+   <title>Raw Strings in Racket</title>
+   <link>http://www.example.com/blog/2011/08/07/raw-strings-in-racket/?utm_source=racket&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2011-08-07-raw-strings-in-racket</guid>
+   <pubDate>Sun, 07 Aug 2011 00:00:00 CEST</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=racket&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F08%2F07%2Fraw-strings-in-racket%2F" height="1" width="1" /&gt;
+ &lt;p&gt;One of the features I missed from the outstanding lisp dialect &lt;a href="http://www.racket-lang.org/"&gt;Racket&lt;/a&gt; (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language&amp;rsquo;s ability to extend its own syntax.  &lt;/p&gt;
+ &lt;p&gt;&lt;strong&gt;2011-08-14 UPDATE:&lt;/strong&gt; This article can be used as a tutorial for implementing readtable extensions to Racket. If you just want the functionality, you can achieve it with the &lt;code&gt;at-exp&lt;/code&gt; language, already included in Racket&amp;rsquo;s distribution. Just skip to the &lt;a href="#at-exp"&gt;at-exp&lt;/a&gt; section at the end of this tutorial to see how.&lt;/p&gt;
+ &lt;h1 id="The problem"&gt;The problem&lt;/h1&gt;
+ &lt;p&gt;This will probably sound familiar to any of you using windows paths or regexes in a language with strings supporting backslash escape sequences. Essentially, the problem is that instead of writing, for example:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(directory-list "\\MACHINE\Share\directory")&lt;/pre&gt;
+ &lt;p&gt; You need to write:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(directory-list "\\\\MACHINE\\Share\\directory")&lt;/pre&gt;
+ &lt;p&gt; Not an awful amount of work, but if you got to appreciate python&amp;rsquo;s convenient &lt;code&gt;r''&lt;/code&gt; and C# &lt;code&gt;@""&lt;/code&gt; syntax, then you&amp;rsquo;d probably miss the feature. &lt;/p&gt;
+ &lt;h1 id="The plan"&gt;The plan&lt;/h1&gt;
+ &lt;p&gt;Racket is extensible by design. When we run a racket program, there are several stages involved:&lt;/p&gt;
+ &lt;ol&gt;
+  &lt;li&gt;First, a &lt;em&gt;reader&lt;/em&gt; layer turns a stream of characters into a kind of&lt;/li&gt;&lt;/ol&gt;
+ &lt;p&gt;AST. Since racket is a lisp, this AST is, of course, made up of s-expressions. But in Racket&amp;rsquo;s case, they&amp;rsquo;re a particular kind of s-expressions which contain extra information on their lexical scope and their source location, and are called &lt;em&gt;syntax objects&lt;/em&gt;.&lt;/p&gt;
+ &lt;ol&gt;
+  &lt;li&gt;After that, those syntax objects are further expanded through the&lt;/li&gt;&lt;/ol&gt;
+ &lt;p&gt;macro layer.&lt;/p&gt;
+ &lt;p&gt;The extension architecture in Racket will let you &amp;ldquo;plug&amp;rdquo; your extension into existing languages, so in the process of creating a new language you can (and usually will) build upon existing features.&lt;/p&gt;
+ &lt;p&gt;Our purpose, then, is to build a new language on top of racket by tuning the reader so that we can pass strings verbatim to the expander layer.&lt;/p&gt;
+ &lt;h1 id="The reader extension"&gt;The reader extension&lt;/h1&gt;
+ &lt;p&gt;Racket provides a standard way to extend the reader by writing the so called &lt;em&gt;reader extensions&lt;/em&gt;. Those are modules that implement the &lt;code&gt;read&lt;/code&gt; and &lt;code&gt;read-syntax&lt;/code&gt; functions. Remember lisp is code-as-data? &lt;code&gt;read&lt;/code&gt; is called when forms are to be used as data, and can return any kind of value; &lt;code&gt;read-syntax&lt;/code&gt; is called when forms are to be interpreted as code, since its output is a syntax object. Apart from the source location and scope, their behaviour should be equivalent not to mislead the users, so you can implement &lt;code&gt;read&lt;/code&gt; from &lt;code&gt;read-syntax&lt;/code&gt; just by stripping the lexical information.&lt;/p&gt;
+ &lt;p&gt;The implementation is listed below:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(require syntax/readerr)
+(provide read read-syntax)
+
+(define (read in)
+  (syntax-&amp;gt;datum (read-syntax #f in)))
+
+(define (read-syntax src in)
+  
+  (define opening-char (read-char in))
+  (define closing-str (case opening-char
+                         [(#\() "\\)"]
+                         [(#\[) "\\]"]
+                         [(#\{) "\\}"]
+                         [else (string opening-char)]))
+  
+  (define regex (pregexp (string-append "^.*?" closing-str)))
+  
+  (define-values (line col pos) (port-next-location in))
+  
+  (define raw-str (regexp-match regex in))
+  
+  (unless raw-str 
+    (raise-read-error "bad raw string syntax"
+                      src line col pos
+                      (- (file-position in) pos)))
+  
+  (define (strip-last-char s)
+    (substring s 0 (- (string-length s) 1)))
+
+  (define (to-syntax v)
+    (datum-&amp;gt;syntax #f ; lexical context. read-syntax should have no lexical context
+                   v; Value
+                   (vector src ; File, normally syntax-source
+                           line  ; line
+                           col  ; column
+                           pos  ; character since beginning of source
+                           (string-length v)  ; the span (width)
+                           ))) ; check location info
+  
+  (to-syntax  (strip-last-char (bytes-&amp;gt;string/locale (car raw-str)))))&lt;/pre&gt;
+ &lt;p&gt; If you name the above module as &lt;code&gt;reader_extension.rkt&lt;/code&gt;, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending &lt;code&gt;#reader"reader_extension.rkt"&lt;/code&gt;. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it&amp;rsquo;s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.&lt;/p&gt;
+ &lt;p&gt;See these rackunit tests for an example:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(require rackunit)
+(check-equal? #reader"reader_extension.rkt"(\\TEST\One) 
+              "\\\\TEST\\One")
+
+(check-equal? #reader"reader_extension.rkt"_\test\no\escape_ 
+              "\\test\\no\\escape")&lt;/pre&gt;
+ &lt;h1 id="The readtable hook"&gt;The readtable hook&lt;/h1&gt;
+ &lt;p&gt;While the above fully works, It may not save much typing having to write &lt;code&gt;#reader"reader_extension.rkt"&lt;/code&gt; instead of manually backslashing the string. It would be more convenient to just use one character, for example &lt;code&gt;$&lt;/code&gt;, like this:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(directory-list $(\\SERVER\Share))&lt;/pre&gt;
+ &lt;p&gt; Fortunately, that&amp;rsquo;s pretty easy: the racket reader is implemented as a recursive descent parser, and you can hook your own functions to call back when the parser sees a character. This association between characters and callbacks is known as the readtable. &lt;/p&gt;
+ &lt;p&gt;The readtable has a dynamic scope (it&amp;rsquo;s a &lt;code&gt;parameter&lt;/code&gt;), and every call to the &lt;code&gt;read&lt;/code&gt; and &lt;code&gt;read-syntax&lt;/code&gt; functions is performed in the context of a readtable. There is, of course, a starting default readtable in case the user didn&amp;rsquo;t specify one.&lt;/p&gt;
+ &lt;h1 id="Using the extension as a language"&gt;Using the extension as a language&lt;/h1&gt;
+ &lt;p&gt;The other drawback of using the &lt;code&gt;#reader"reader_extension.rkt"&lt;/code&gt; prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;#lang with-raw-string racket #\%
+(regexp-split (pregexp %'\s') "two fields")&lt;/pre&gt;
+ &lt;p&gt; Meaning that you add raw string syntax on top of the &lt;code&gt;racket&lt;/code&gt; language with &lt;code&gt;%&lt;/code&gt; as your readtable character.&lt;/p&gt;
+ &lt;h1 id="The syntax-module/reader language"&gt;The syntax-module/reader language&lt;/h1&gt;
+ &lt;p&gt;Fortunately, both problems can be solved by using the syntax/module-reader language, which is a helper language for installing your own languages into a Racket distribution.&lt;/p&gt;
+ &lt;p&gt;All you need to do is locate the collects dir &lt;code&gt;(find-user-collects-dir)&lt;/code&gt; and place the &amp;ldquo;reader_extension.rkt&amp;rdquo; in a subdirectory called &lt;code&gt;with-raw-string/lang&lt;/code&gt; together with a &lt;code&gt;reader.rkt&lt;/code&gt; with this contents:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(module reader syntax/module-reader
+  #:language read 
+  #:wrapper2 (lambda (in rd)
+               (parameterize ([current-readtable 
+                               (make-raw-str-readtable (read in))])
+                 (rd in)))
+  
+  (require syntax/readerr
+           (prefix-in raw: "reader_extension.rkt"))
+    
+  (define readtable-hook
+    (case-lambda
+      [(ch in)
+       (raw:read in)]
+      [(ch in src line col pos)
+       (raw:read-syntax src in)]))
+  
+  (define (make-raw-str-readtable c)
+    (make-readtable (current-readtable)
+                    c 'terminating-macro readtable-hook)))&lt;/pre&gt;
+ &lt;p&gt; The interesting points are:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;The &lt;code&gt;make-raw-str-readtable&lt;/code&gt; will create a readtable that will&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;call the &lt;code&gt;reader_extension&lt;/code&gt; functions with its character argument.&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;The &lt;code&gt;#:language&lt;/code&gt; keyword will let you specify the underlying&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;language. It can be a literal or a callback function. In this case we use the &lt;code&gt;read&lt;/code&gt; function as a callback, so that we read the underlying language from the input stream.&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;The &lt;code&gt;#:wrapper2&lt;/code&gt; callback will parameterize both &lt;code&gt;read&lt;/code&gt; and&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;&lt;code&gt;read-syntax&lt;/code&gt; with the quote-character enhanced readtable.  Note that the quoting char is also read from the input stream first.&lt;/p&gt;
+ &lt;p&gt;&lt;a name="at-exp"&gt; &lt;/a&gt; # UPDATE: The &lt;code&gt;at-exp&lt;/code&gt; language &lt;/p&gt;
+ &lt;p&gt;After posting a link to this tutorial to the &lt;code&gt;users@racket-lang.org&lt;/code&gt; mailing list (a very active and helpful list for Racket users), Eli Barzilay (one of Racket&amp;rsquo;s core developers) pointed out that the &lt;a href="http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp"&gt;at-exp&lt;/a&gt; language could be used to achieve the same results. This language acts at the reader level and was originally developed for &lt;a href="http://docs.racket-lang.org/scribble/index.html?q=scribble"&gt;scribble&lt;/a&gt; (a family of languages for writing textual content, such as racket&amp;rsquo;s documentation itself).&lt;/p&gt;
+ &lt;p&gt;Basically, &lt;code&gt;at-exp&lt;/code&gt; extends another language (passed in as a parameter, like the one in this tutorial), so that expressions of the form:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;@func{Text here}&lt;/pre&gt;
+ &lt;p&gt; make it to the expansion layer like&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(func "Text here")&lt;/pre&gt;
+ &lt;p&gt; Where text is read literally (no backslash substitution). So here&amp;rsquo;s a way to achieve the same functionality we expected just by what&amp;rsquo;s already provided by Racket:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;#lang at-exp racket
+(define r string-append)
+(display @r{...nearly free text here...})&lt;/pre&gt;
+ &lt;p&gt; When using &lt;strong&gt;DrRacket&lt;/strong&gt;, you can press the &lt;em&gt;Macro Stepper&lt;/em&gt; button to see how the above is read:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(module anonymous-module racket
+  (#%module-begin
+   (define r string-append)
+   (display (r "...nearly free text here..."))))&lt;/pre&gt;
+ &lt;p&gt; Of course, the &lt;code&gt;r&lt;/code&gt; is there just to make the syntax shorter... you could just use &lt;code&gt;string-append&lt;/code&gt; each time. There is also another way to pass parameters to the &lt;code&gt;@&lt;/code&gt; functions, which is not relevant here, through &lt;code&gt;[]&lt;/code&gt;. Check the &lt;a href="http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp"&gt;docs&lt;/a&gt; for the details.&lt;/p&gt;
+ &lt;h1 id="Conclusions"&gt;Conclusions&lt;/h1&gt;
+ &lt;p&gt;You see how easy it is to add new features on top of the Racket language. How many languages do you know that you can modify to match your needs in this way?&lt;/p&gt;
+ &lt;p&gt;BTW, The above code is available at &lt;a href="http://github.com/jarnaldich/with-raw-string"&gt;github&lt;/a&gt;.&lt;/p&gt;
+ &lt;h1 id="Further Reading"&gt;Further Reading&lt;/h1&gt;
+ &lt;p&gt;Check out &lt;a href="http://docs.racket-lang.org/guide/languages.html"&gt;the excellent Racket documentation&lt;/a&gt; on creating new languages for racket. Seriously, the racket documentation system is as impressive as Racket itself.&lt;/p&gt;
+ &lt;p&gt;Check out &lt;a href="http://hashcollision.org/brainfudge/"&gt;This article&lt;/a&gt; for a more complete example on how to design a Turing-complete (but maybe not that useful) language in Racket.&lt;/p&gt;
+ &lt;p&gt;Check out &lt;a href="http://matt.might.net/articles/implementing-a-programming-language/"&gt;This other article&lt;/a&gt; to see how to develop an interpreter for two small languages, but without using Racket&amp;rsquo;s language extension mechanisms (evaluation is performed at run-time, through an eval function).&lt;/p&gt;&lt;/html&gt;</description></item></channel></rss>
