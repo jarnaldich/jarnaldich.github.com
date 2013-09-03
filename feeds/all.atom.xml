@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
- <title type="text">My Awesome Blog: All Posts</title>
+ <title type="text">Joan Arnaldich's blog: All Posts</title>
  <link rel="self" href="http://www.example.com/feeds/all.atom.xml" />
  <link href="http://www.example.com/index.html" />
  <id>urn:http-www-example-com:-index-html</id>
@@ -12,7 +12,7 @@
   <published>2013-02-24T00:00:00Z</published>
   <updated>2013-02-24T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2013%2F02%2F24%2Fraw-strings-in-factor%2F" height="1" width="1" /&gt;
  &lt;p&gt;Ok, you may think I have a fixation with &lt;a href="blog/2011/08/07/raw-strings-in-racket/"&gt;raw strings&lt;/a&gt;, but if you&amp;rsquo;re like most developers and have used different languages through the years, you probably know the feeling of wanting to port your favourite features from language to language.&lt;/p&gt;
@@ -69,7 +69,7 @@ IN: scratchpad &lt;/pre&gt;
   <published>2011-08-07T00:00:00Z</published>
   <updated>2011-08-07T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2011%2F08%2F07%2Fraw-strings-in-racket%2F" height="1" width="1" /&gt;
  &lt;p&gt;One of the features I missed from the outstanding lisp dialect &lt;a href="http://www.racket-lang.org/"&gt;Racket&lt;/a&gt; (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language&amp;rsquo;s ability to extend its own syntax.  &lt;/p&gt;
@@ -214,7 +214,7 @@ IN: scratchpad &lt;/pre&gt;
   <published>2011-07-13T00:00:00Z</published>
   <updated>2011-07-13T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F13%2Frun-legacy-apps-as-windows-services%2F" height="1" width="1" /&gt;
  &lt;p&gt;Although the right thing to do when programming a windows service is to use Microsoft&amp;rsquo;s API from the very beginning, it may also be desirable to run a regular executable as a service. &lt;/p&gt;
@@ -236,7 +236,7 @@ IN: scratchpad &lt;/pre&gt;
   <published>2011-07-01T00:00:00Z</published>
   <updated>2011-07-01T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F01%2Fblogging-with-jekyll%2F" height="1" width="1" /&gt;
  &lt;p&gt;... or, &amp;ldquo;from static to dynamic and back again&amp;rdquo;.&lt;/p&gt;

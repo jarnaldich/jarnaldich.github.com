@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
- <title type="text">My Awesome Blog: Posts tagged 'lisp'</title>
+ <title type="text">Joan Arnaldich's blog: Posts tagged 'lisp'</title>
  <link rel="self" href="http://www.example.com/feeds/lisp.atom.xml" />
  <link href="http://www.example.com/tags/lisp.html" />
  <id>urn:http-www-example-com:-tags-lisp-html</id>
@@ -12,7 +12,7 @@
   <published>2011-08-07T00:00:00Z</published>
   <updated>2011-08-07T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=lisp&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2011%2F08%2F07%2Fraw-strings-in-racket%2F" height="1" width="1" /&gt;
  &lt;p&gt;One of the features I missed from the outstanding lisp dialect &lt;a href="http://www.racket-lang.org/"&gt;Racket&lt;/a&gt; (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language&amp;rsquo;s ability to extend its own syntax.  &lt;/p&gt;

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
- <title type="text">My Awesome Blog: Posts tagged 'factor'</title>
+ <title type="text">Joan Arnaldich's blog: Posts tagged 'factor'</title>
  <link rel="self" href="http://www.example.com/feeds/factor.atom.xml" />
  <link href="http://www.example.com/tags/factor.html" />
  <id>urn:http-www-example-com:-tags-factor-html</id>
@@ -12,7 +12,7 @@
   <published>2013-02-24T00:00:00Z</published>
   <updated>2013-02-24T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=factor&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2013%2F02%2F24%2Fraw-strings-in-factor%2F" height="1" width="1" /&gt;
  &lt;p&gt;Ok, you may think I have a fixation with &lt;a href="blog/2011/08/07/raw-strings-in-racket/"&gt;raw strings&lt;/a&gt;, but if you&amp;rsquo;re like most developers and have used different languages through the years, you probably know the feeling of wanting to port your favourite features from language to language.&lt;/p&gt;

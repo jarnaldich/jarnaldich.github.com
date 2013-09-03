@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
- <title type="text">My Awesome Blog: Posts tagged 'blogging'</title>
+ <title type="text">Joan Arnaldich's blog: Posts tagged 'blogging'</title>
  <link rel="self" href="http://www.example.com/feeds/blogging.atom.xml" />
  <link href="http://www.example.com/tags/blogging.html" />
  <id>urn:http-www-example-com:-tags-blogging-html</id>
@@ -12,7 +12,7 @@
   <published>2011-07-01T00:00:00Z</published>
   <updated>2011-07-01T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=blogging&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F01%2Fblogging-with-jekyll%2F" height="1" width="1" /&gt;
  &lt;p&gt;... or, &amp;ldquo;from static to dynamic and back again&amp;rdquo;.&lt;/p&gt;

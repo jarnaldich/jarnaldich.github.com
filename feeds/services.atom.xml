@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
- <title type="text">My Awesome Blog: Posts tagged 'services'</title>
+ <title type="text">Joan Arnaldich's blog: Posts tagged 'services'</title>
  <link rel="self" href="http://www.example.com/feeds/services.atom.xml" />
  <link href="http://www.example.com/tags/services.html" />
  <id>urn:http-www-example-com:-tags-services-html</id>
@@ -12,7 +12,7 @@
   <published>2011-07-13T00:00:00Z</published>
   <updated>2011-07-13T00:00:00Z</updated>
   <author>
-   <name>The Unknown Author</name></author>
+   <name>Joan Arnaldich</name></author>
   <content type="html">
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=services&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F13%2Frun-legacy-apps-as-windows-services%2F" height="1" width="1" /&gt;
  &lt;p&gt;Although the right thing to do when programming a windows service is to use Microsoft&amp;rsquo;s API from the very beginning, it may also be desirable to run a regular executable as a service. &lt;/p&gt;

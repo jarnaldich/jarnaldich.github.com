@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?> 
 <rss version="2.0">
  <channel>
-  <title>My Awesome Blog: Posts tagged 'jekyll'</title>
-  <description>My Awesome Blog: Posts tagged 'jekyll'</description>
+  <title>Joan Arnaldich's blog: Posts tagged 'jekyll'</title>
+  <description>Joan Arnaldich's blog: Posts tagged 'jekyll'</description>
   <link>http://www.example.com/tags/jekyll.html</link>
   <lastBuildDate>Fri, 01 Jul 2011 00:00:00 CEST</lastBuildDate>
   <pubDate>Fri, 01 Jul 2011 00:00:00 CEST</pubDate>
