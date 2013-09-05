@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<rss version="2.0">
+ <channel>
+  <title>Joan Arnaldich's Blog : Posts tagged 'windows'</title>
+  <description>Joan Arnaldich's Blog : Posts tagged 'windows'</description>
+  <link>http://www.example.com/tags/windows.html</link>
+  <lastBuildDate>Wed, 13 Jul 2011 00:00:00 CEST</lastBuildDate>
+  <pubDate>Wed, 13 Jul 2011 00:00:00 CEST</pubDate>
+  <ttl>1800</ttl>
+  <item>
+   <title>Run Legacy Apps as Windows Services</title>
+   <link>http://www.example.com/blog/2011/07/13/run-legacy-apps-as-windows-services/?utm_source=windows&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2011-07-13-run-legacy-apps-as-windows-services</guid>
+   <pubDate>Wed, 13 Jul 2011 00:00:00 CEST</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=windows&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F13%2Frun-legacy-apps-as-windows-services%2F" height="1" width="1" /&gt;
+ &lt;h1 id="The problem"&gt;The problem&lt;/h1&gt;
+ &lt;p&gt;Although the right thing to do when programming a windows service is to use Microsoft&amp;rsquo;s API from the very beginning, it may also be desirable to run a regular executable as a service. &lt;/p&gt;
+ &lt;p&gt;A typical candidate would be a legacy TCP server, so that you get:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;automatic startup without login.&lt;/li&gt;
+  &lt;li&gt;integration with third-party monitoring apps.&lt;/li&gt;
+  &lt;li&gt;the ability to define failure recovery policies.&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;Microsoft had already noticed this, so they provide the executable &lt;a href="http://support.microsoft.com/kb/137890"&gt;SRVANY&lt;/a&gt; as part of the &lt;strong&gt;Windows Resource Kit&lt;/strong&gt;; but sometimes installing the whole resource kit may not be an option, specially in a production server. &lt;/p&gt;
+ &lt;p&gt;It would be nicer to have a small application you could just xcopy-deploy that would allow you to install, remove and update the properties of your service candidate.&lt;/p&gt;
+ &lt;h1 id="The solution"&gt;The solution&lt;/h1&gt;
+ &lt;p&gt;Here&amp;rsquo;s where &lt;a href="http://www.cygwin.com/"&gt;CygWin&amp;rsquo;s&lt;/a&gt; little {{cygrunsrv}} comes handy. Notice that, although it behaves nicely with cygwin apps, it can be used with &lt;strong&gt;any&lt;/strong&gt; Win32 executable.&lt;/p&gt;
+ &lt;p&gt;To use it, you just need to put the files &lt;code&gt;cygrunsrv.exe&lt;/code&gt; and &lt;code&gt;cygwin1.dll&lt;/code&gt; in the same directory and go. Unfortunately, both files lie in different packages and cannot, AFAIK, be downloaded on their own, so the first time you&amp;rsquo;ll have to download and uncompress the files {{cygrunsrv-1.34.1.tar.bz2}} and {{cygwin-1.7.9-1.tar.bz2}}, (version may differ in the future) from whatever mirror is most suitable for you. &lt;/p&gt;
+ &lt;p&gt;The full documentation for this tool is &lt;a href="http://web.mit.edu/cygwin/cygwin_v1.3.2/usr/doc/Cygwin/cygrunsrv.README"&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;/html&gt;</description></item></channel></rss>

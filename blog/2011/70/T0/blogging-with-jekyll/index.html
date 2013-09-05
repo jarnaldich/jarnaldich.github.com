@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+
+    <meta charset="utf-8">
+    <title>Blogging with Jekyll</title>
+    <meta name="description" content="... or, &quot;from static to dynamic and back again&quot;. I've finally decided to set-up a new technical blog. I think one of the main reasons it took me so long to start was that I couldn't find an engine that matched my taste. Ok... as a coder, my taste is not exactly that of a final user: I didn't want to pay. I woult have felt a bit dumb knowing I could be using something like WordPress or Blogger for free even if they're not exactly what I'm looking for. I don't think storing pages in a relational DB is the smartest thing to do. Relational DBs are for structured data, not documents.  I want to be able to use the tools I learned to love as a coder in my posts. After all, It's all about text, right? I want versioning, regexp searches, and all that good old unix tools for text processing. I'd rather die than use a web-based editor. I want to be able to produce high quality, standards compliant and easily modifyable html... but authoring in a more human-friendly markup, of course...  I don't want to be stuck to a system once I've started. What I care most is content. I want to be able to migrate my posts whenever I want.  The system should be elegant, not a bunch of scripts tied together. ...">
+    <meta name="author"      content="The Unknown Blogger">
+    <meta name="keywords"    content="jekyll, blogging">
+    <meta name="viewport"    content="width=device-width, initial-scale=1.0">
+    <link rel="icon"      href="/favicon.ico">
+    <link rel="canonical" href="http://www.example.com/blog/2011/70/T0/blogging-with-jekyll/">
+    <!-- CSS -->
+    <link rel="stylesheet" type="text/css" href="/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="/css/pygments.css">
+    <link rel="stylesheet" type="text/css" href="/css/scribble.css">
+    <link rel="stylesheet" type="text/css" href="/css/custom.css">
+    <!-- Feeds -->
+    <link ref="alternate" type="application/atom+xml"
+          href="/feeds/all.atom.xml" title="Atom Feed">
+    <link ref="alternate" type="application/rss+xml"
+          href="/feeds/all.rss.xml" title="RSS Feed">
+    <!-- JS -->
+    <script type="text/javascript">
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-xxxxx']);
+      _gaq.push(['_setDomainName', 'example.com']);
+      _gaq.push(['_trackPageview']);
+      setTimeout(function(){_gaq.push(['_trackEvent', '30_seconds', 'read'])}, 30000); // http://drawingablank.me/blog/fix-your-bounce-rate.html
+      (function() {
+          var ga = document.createElement('script');
+          ga.type = 'text/javascript'; ga.async = true;
+          ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+          var s = document.getElementsByTagName('script')[0];
+          s.parentNode.insertBefore(ga, s);
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- A standard Twitter Bootstrap nav bar -->
+    <header class="navbar navbar-default navbar-inverse"
+            role="banner">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button"
+                  class="navbar-toggle"
+                  data-toggle="collapse"
+                  data-target=".our-nav-collapse">
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a href="/index.html" class="navbar-brand">Joan Arnaldich</a>
+        </div>
+        <div class="collapse navbar-collapse our-nav-collapse"
+             role="navigation">
+          <ul class="nav navbar-nav">
+
+            <li class="dropdown">
+              <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                Tags <b class="caret"></b></a>
+              <ul class="dropdown-menu">
+                <li><a href="/index.html">All Posts</a></li>
+
+<li><a href="/tags/blogging.html">blogging</a></li>
+
+<li><a href="/tags/jekyll.html">jekyll</a></li>
+
+<li><a href="/tags/lisp.html">lisp</a></li>
+
+<li><a href="/tags/racket.html">racket</a></li>
+
+<li><a href="/tags/scheme.html">scheme</a></li>
+              </ul>
+            </li>
+            <li>
+              <a href="/About.html">About</a>
+            </li> 
+            <li><a href="/feeds/all.atom.xml">Atom</a></li>
+            <li><a href="/feeds/all.rss.xml">RSS</a></li>
+          </ul>
+        </div>
+    </header>
+    <div class="container">
+      <div class="row">
+
+        <!-- Main column -->
+        <div id="left" class="col-md-1"></div>
+        <div id="content" class="col-md-10">
+
+
+
+
+
+
+<article>
+
+ <header>
+
+  <h1>Blogging with Jekyll</h1>
+
+  <p class="date-and-tags">
+   <time datetime="20110701T0" pubdate="true">20110701T0</time> :: <a href="/tags/jekyll.html">jekyll</a>, <a href="/tags/blogging.html">blogging</a></p>
+  </header>
+
+
+ <p>... or, &ldquo;from static to dynamic and back again&rdquo;.</p>
+
+
+ <p>I&rsquo;ve finally decided to set-up a new technical blog. I think one of the main reasons it took me so long to start was that I couldn&rsquo;t find an engine that matched my taste. Ok... as a coder, my taste is not exactly that of a final user:</p>
+
+
+ <ul>
+
+  <li>I didn&rsquo;t want to pay. I woult have felt a bit dumb knowing I could be using something like <a href="http://www.wordpress.com">WordPress</a> or <a href="http://www.blogger.com">Blogger</a> for free even if they&rsquo;re not exactly what I&rsquo;m looking for.</li>
+
+  <li>I don&rsquo;t think storing pages in a relational DB is the smartest thing to do. Relational DBs are for structured data, not documents. </li>
+
+  <li>I want to be able to use the tools I learned to love as a coder in my posts. After all, It&rsquo;s all about text, right? I want versioning, regexp searches, and all that good old unix tools for text processing.</li>
+
+  <li>I&rsquo;d rather die than use a web-based editor.</li>
+
+  <li>I want to be able to produce high quality, standards compliant and easily modifyable html... but authoring in a more human-friendly markup, of course... </li>
+
+  <li>I don&rsquo;t want to be stuck to a system once I&rsquo;ve started. What I care most is content. I want to be able to migrate my posts whenever I want. </li>
+
+  <li>The system should be elegant, not a bunch of scripts tied together.</li></ul>
+
+
+ <p>After reading <a href="http://tom.preston-werner.com/2008/11/17/blogging-like-a-hacker.html">this post</a>, it became clear that what I wanted was a <em>static</em> site generator.</p>
+
+
+ <p>Static? But that&rsquo;s soooo 1990s... well yes... and no. I&rsquo;ve you&rsquo;ve ever tried to roll your own blog engine (a common web framework learning exercice), and got to the point of optimization, you may have come to realize that you can cache most, if not all, your content... mmmmm... This is certainly oversimplifying, but you get the point:</p>
+
+
+ <p>DYNAMIC + A WHOLE LOT OF CACHING = STATIC</p>
+
+
+ <p>The other, probably most relevant, difference from the 90s is the mashups culture. Your web app can rely on third party services for its dynamic parts. (IMHO, Even if you are able to serve dynamic content, it&rsquo;s still interesting to use some of those services).</p>
+
+
+ <p>Now that you know the <em>whys</em>, let&rsquo;s talk about the <em>hows</em>.</p>
+
+
+ <p>## Jekyll There are several static page generators out there (just Google for them). I feel confident with Ruby, but the key point here was <a href="http://pages.github.com/">Github Pages</a> having automatic <a href="http://jekyllrb.com/">Jekyll</a> processing (no suprise: jekyll&rsquo;s author is one of the Github founders). </p>
+
+
+ <p>I must admit I am curious about <a href="http://jaspervdj.be/hakyll/">Hakyll</a> too... </p>
+
+
+ <p>With jekyll, you get:</p>
+
+
+ <ul>
+
+  <li>A full templating system based on markup authoring run through <a href="http://www.liquidmarkup.org/">liquid</a>-powered templates.</li>
+
+  <li>Syntax highlighting (through) pygments. Just install it and run with the <code>--pygments</code> option.</li>
+
+  <li>Tagging (not directly, but easy to add).</li>
+
+  <li>A content-based related posts feature.</li></ul>
+
+
+ <p>Plus, of course, the possibility to store your blog at GitHub.</p>
+
+
+ <h2 id="Comments system">Comments system</h2>
+
+
+ <p>There are some good reasons for using a third party comment system instead of your own (security, merging different sources, statistics...), even if you can serve dynamic content. For this blog I chose <a href="http://disqus.com/">disqus</a>, but there are others...</p>
+
+
+ <h2 id="Github">Github</h2>
+
+
+ <p>Both the content and the templates for this blog are hosted at a Github free account, which will even let you redirect your domain. You can check the source code, fork the repo or whatever <a href="https://github.com/jarnaldich/jarnaldich.github.com">here</a>.</p>
+
+
+ <h2 id="Updates as of Feb 2013">Updates as of Feb 2013</h2>
+
+
+ <p>Some other tools have sprung around github pages / Jekyll. If I started blogging now I&rsquo;d probably check them out:</p>
+
+
+ <ul>
+
+  <li><a href="http://octopress.org">Octopress</a> Is built on top of Jekyll to help hackers with the boring part of setting up a bloc (css, html templates, etc...).</li>
+
+  <li><a href="http://jekyllbootstrap.org">Jekyll bootstrap</a> Helps setting up a github pages account. There&rsquo;s a new project by the same author that aims to be language agnostic called <a href="http://ruhoh.com">ruhoh</a>.</li></ul>
+
+ <footer>
+
+  <script type="text/javascript">
+      !function(d,s,id){
+          var js,fjs=d.getElementsByTagName(s)[0];
+          if(!d.getElementById(id)){
+              js=d.createElement(s);
+              js.id=id;
+              js.src="//platform.twitter.com/widgets.js";
+              fjs.parentNode.insertBefore(js,fjs);
+          }
+      }(document,"script","twitter-wjs");
+    </script>
+    <a class="twitter-share-button" data-dnt="true" data-url="http://www.example.com/blog/2011/70/T0/blogging-with-jekyll/" href="https://twitter.com/share">
+      "Tweet"</a>
+
+  <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+
+  <g:plusone href="http://www.example.com/blog/2011/70/T0/blogging-with-jekyll/" size="medium"></g:plusone>
+
+  <script type="text/javascript">
+      var disqus_shortname = 'shortname';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+    </script>
+
+  <div id="disqus_thread"></div>
+
+  <ul class="pager">
+
+
+   <li class="next">
+        <a href="/blog/2011/08/07/raw-strings-in-racket/"><em>Raw Strings in Racket</em> &rarr;</a>
+      </li>
+    </ul>
+  </footer>
+</article>
+        </div>
+      </div>
+      <div id="right" class="col-md-1"></div>
+      <footer>
+        <hr />
+        <p><a href="https://twitter.com/racketlang"
+              class="twitter-follow-button"
+              data-show-count="false"
+              data-lang="en">
+             "Follow RacketLang"
+           </a>
+           <script type="text/javascript">
+             !function(d,s,id){
+                 var js,fjs=d.getElementsByTagName(s)[0];
+                 if(!d.getElementById(id)){
+                     js=d.createElement(s);
+                     js.id=id;
+                     js.src="//platform.twitter.com/widgets.js";
+                     fjs.parentNode.insertBefore(js,fjs);
+                 }
+             }(document,"script","twitter-wjs");
+           </script></p>
+        <p>Site generated
+        by <a href="https://github.com/greghendershott/frog">Frog</a>,
+        the <strong>fr</strong>ozen bl<strong>og</strong> tool.</p>
+        <p>Using <a href="http://twitter.github.com/bootstrap/index.html">Bootstrap</a>.</p>
+        <p><em>Your legal notice here</em>.</p>
+      </footer>
+    </div>
+    <!-- </body> JS -->
+    <script type="text/javascript" src="//code.jquery.com/jquery.js"></script>
+    <script type="text/javascript" src="/js/bootstrap.min.js"></script>
+  </body>
+</html>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+ <title type="text">Joan Arnaldich's Blog : Posts tagged 'foo'</title>
+ <link rel="self" href="http://www.example.com/feeds/foo.atom.xml" />
+ <link href="http://www.example.com/tags/foo.html" />
+ <id>urn:http-www-example-com:-tags-foo-html</id>
+ <updated>2012-01-01T00:00:00Z</updated>
+ <entry>
+  <title type="text">A 2012 blog post</title>
+  <link rel="alternate" href="http://www.example.com/blog/2012/01/01/a-2012-blog-post/?utm_source=foo&amp;utm_medium=Atom" />
+  <id>urn:http-www-example-com:-blog-2012-01-01-a-2012-blog-post</id>
+  <published>2012-01-01T00:00:00Z</published>
+  <updated>2012-01-01T00:00:00Z</updated>
+  <author>
+   <name>Joan Arnaldich</name></author>
+  <content type="html">
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=foo&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2012%2F01%2F01%2Fa-2012-blog-post%2F" height="1" width="1" /&gt;
+ &lt;p&gt;Here is an example blog post.&lt;/p&gt;
+ &lt;p&gt;Everything after this paragraph &amp;ldquo;after the break&amp;rdquo;. On index pages and Atom feeds, it will become &amp;ldquo;Continue reading...&amp;rdquo;, if you configure them to include only the summary &amp;ldquo;blurb&amp;rdquo; before the break.&lt;/p&gt;
+ &lt;pre&gt;some code&lt;/pre&gt;
+ &lt;p&gt;Here&amp;rsquo;s some &lt;a href="http://bullshitipsum.com/?paragraphs=2"&gt;Bullshit Ipsum&lt;/a&gt;.&lt;/p&gt;
+ &lt;p&gt;Addelivery integrate ecologies e-markets standards-compliant utilize technologies aggregate addelivery viral&lt;span&gt;&amp;mdash;&lt;/span&gt;communities dynamic functionalities. Mindshare engineer viral A-list: cross-platform remix engage social cross-media social innovate distributed matrix experiences monetize utilize innovative. Action-items transition recontextualize sexy Cluetrain envisioneer, &amp;ldquo;vortals communities evolve technologies sexy methodologies.&amp;rdquo; Enhance grow compelling iterate architect matrix plug-and-play reinvent scale, distributed incentivize, extend.&lt;/p&gt;
+ &lt;p&gt;Revolutionary proactive. Target; envisioneer e-services sticky robust morph users methodologies, markets content supply-chains, granular monetize reinvent harness initiatives. Plug-and-play productize vortals integrate compelling aggregate, user-contributed, integrate web-enabled grow extend mindshare, repurpose world-class harness next-generation eyeballs solutions blogospheres extend. Rss-capable methodologies, &amp;ldquo;vortals vertical,&amp;rdquo; synthesize real-time user-contributed impactful utilize architect deploy ROI redefine design proactive strategic user-centric.&lt;/p&gt;
+ &lt;p&gt;Here&amp;rsquo;s a footnote&lt;sup&gt;1&lt;/sup&gt;.&lt;/p&gt;
+ &lt;h2 id="Code blocks"&gt;Code blocks&lt;/h2&gt;
+ &lt;p&gt;Frog optionally uses &lt;a href="http://pygments.org/"&gt;Pygments&lt;/a&gt; if it&amp;rsquo;s installed to do syntax highlighting. In your markdown using backtick code blocks you can specify a language:&lt;/p&gt;
+ &lt;pre&gt;```language
+some racket code
+```&lt;/pre&gt;
+ &lt;p&gt;That name is given to Pygments as the lexer to use.&lt;/p&gt;
+ &lt;p&gt;For example this:&lt;/p&gt;
+ &lt;pre&gt;```js
+/**
+ * Some JavaScript
+ */
+function foo()
+{
+    if (counter &amp;lt;= 10)
+        return;
+    // it works!
+```&lt;/pre&gt;
+ &lt;p&gt;Yields this:&lt;/p&gt;
+ &lt;pre class="brush: js"&gt;/**
+ * Some JavaScript
+ */
+function foo()
+{
+    if (counter &amp;lt;= 10)
+        return;
+    // it works!&lt;/pre&gt;
+ &lt;p&gt; And this:&lt;/p&gt;
+ &lt;pre&gt;```racket
+#lang racket
+;; Finds Racket sources in all subdirs
+(for ([path (in-directory)])
+  (when (regexp-match? #rx"[.]rkt$" path)
+    (printf "source file: ~a\n" path)))
+(symbol-&amp;gt;string 'foo)
+```&lt;/pre&gt;
+ &lt;p&gt;Yields this:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;#lang racket
+;; Finds Racket sources in all subdirs
+(for ([path (in-directory)])
+  (when (regexp-match? #rx"[.]rkt$" path)
+    (printf "source file: ~a\n" path)))
+(symbol-&amp;gt;string 'foo)&lt;/pre&gt;
+ &lt;p&gt; Notice that, for Racket, symbols with unambiguous documentation (provided by one library, or provided by several where one is &lt;code&gt;racket&lt;/code&gt; or &lt;code&gt;racket/base&lt;/code&gt;) are links to that documentation.&lt;/p&gt;
+ &lt;p&gt;This also works outside fenced code blocks, for symbols in backticks immediately followed by &lt;code&gt;[racket]&lt;/code&gt;. Example: &lt;code class="brush: racket"&gt;printf&lt;/code&gt;. This isn&amp;rsquo;t official Markdown; it&amp;rsquo;s simply a pun on link syntax and fenced code block languages. This is similar to using &lt;code&gt;@racket[printf]&lt;/code&gt; in Scribble.&lt;/p&gt;
+ &lt;p&gt;&lt;code class="brush: racket"&gt;symbol-&amp;gt;string&lt;/code&gt;.&lt;/p&gt;
+ &lt;p&gt;Here is a lambda: λ.&lt;/p&gt;
+ &lt;p&gt;Here is a lambda in code backticks: &lt;code&gt;λ&lt;/code&gt;.&lt;/p&gt;
+ &lt;p&gt;And here in indented code block:&lt;/p&gt;
+ &lt;pre&gt;(λ () #t)&lt;/pre&gt;
+ &lt;p&gt;And here in fenced code block, no lang specified:&lt;/p&gt;
+ &lt;pre&gt;(λ () #t)&lt;/pre&gt;
+ &lt;p&gt; And here in fenced code block, lang = &lt;code&gt;racket&lt;/code&gt;:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(λ () #t)&lt;/pre&gt;
+ &lt;p&gt; And here in fenced code block, lang = &lt;code&gt;scheme&lt;/code&gt;:&lt;/p&gt;
+ &lt;pre class="brush: scheme"&gt;(λ () #t)&lt;/pre&gt;
+ &lt;p&gt; Here&amp;rsquo;s a simple &lt;code&gt;for&lt;/code&gt; macro, written in &lt;a href="http://docs.racket-lang.org/reference/stx-patterns.html"&gt;Racket&lt;/a&gt;:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(define-syntax-rule (for (x e1) e2)
+  (for-each (λ (x) e2) e1))&lt;/pre&gt;
+ &lt;p&gt; The end.&lt;/p&gt;
+ &lt;div id="2012-01-01-a-2012-blog-post-footnote-1-definition" class="footnote-definition"&gt;
+  &lt;p&gt;1: Footnote definition. &lt;/p&gt;&lt;/div&gt;&lt;/html&gt;</content></entry></feed>

@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<rss version="2.0">
+ <channel>
+  <title>Joan Arnaldich's blog: All Posts</title>
+  <description>Joan Arnaldich's blog: All Posts</description>
+  <link>http://www.example.com/index.html</link>
+  <lastBuildDate>Sun, 24 Feb 2013 00:00:00 CEST</lastBuildDate>
+  <pubDate>Sun, 24 Feb 2013 00:00:00 CEST</pubDate>
+  <ttl>1800</ttl>
+  <item>
+   <title>Raw Strings in Factor </title>
+   <link>http://www.example.com/blog/2013/02/24/raw-strings-in-factor/?utm_source=all&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2013-02-24-raw-strings-in-factor</guid>
+   <pubDate>Sun, 24 Feb 2013 00:00:00 CEST</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2013%2F02%2F24%2Fraw-strings-in-factor%2F" height="1" width="1" /&gt;
+ &lt;p&gt;Ok, you may think I have a fixation with &lt;a href="blog/2011/08/07/raw-strings-in-racket/"&gt;raw strings&lt;/a&gt;, but if you&amp;rsquo;re like most developers and have used different languages through the years, you probably know the feeling of wanting to port your favourite features from language to language.&lt;/p&gt;
+ &lt;p&gt;Most languages just won&amp;rsquo;t let you do anything about it, but then, happily, there is also a whole family of &lt;em&gt;programmable programming languages&lt;/em&gt;: &lt;a href="http://www.paulgraham.com/chameleon.html"&gt;Lisps&lt;/a&gt; being the most notable members among them.&lt;/p&gt;
+ &lt;p&gt;But there are, for sure, other languages in other sometimes forgotten paradigms.&lt;/p&gt;
+ &lt;h2 id="Concatenative"&gt;Concatenative&lt;/h2&gt;
+ &lt;p&gt;&lt;a href="http://factorcode.org"&gt;Factor&lt;/a&gt; is a so-called &lt;a href="http://concatenative.org/wiki/view/Concatenative%20language"&gt;concatenative&lt;/a&gt; language. More precisely, it a &lt;a href="http://c2.com/cgi/wiki?StackBasedLanguage"&gt;stack-based one&lt;/a&gt;. What sets it apart from other concatenative languages IMHO is that it&amp;rsquo;s a &lt;em&gt;general purpose&lt;/em&gt; (Forth is more oriented towards embedded systems) &lt;em&gt;practical&lt;/em&gt; (not just a theoretical tool) and &lt;em&gt;modern&lt;/em&gt;: its creator Slava Pestov and the development team have brilliantly shown how object orientation, incremental compilation, and bunch of advanced language features can be put to work in a concatenative language.&lt;/p&gt;
+ &lt;h2 id="Factor as a shell"&gt;Factor as a shell&lt;/h2&gt;
+ &lt;p&gt;Factor has a very terse syntax. This can be good or bad, depending on your application and the way your brain is wired up. Lately, I&amp;rsquo;ve started using its &lt;a href="http://re-factor.blogspot.com.es/2010/09/visual-repl.html"&gt;visual repl&lt;/a&gt; as an os shell on steroids (I&amp;rsquo;ll eventually blog on the experience). I think it makes sense since I spend a good share of my time on Windows and I&amp;rsquo;m not crazy about the syntax of Powershell. A shell is clearly one of the applications where less typing is just the right thing, and the stack-based model sometimes feels like a natural upgrade of unix piping (I&amp;rsquo;m thinking of the &lt;a href="http://docs.factorcode.org/content/article-dataflow-combinators.html"&gt;dataflow combinators&lt;/a&gt; here).&lt;/p&gt;
+ &lt;h2 id="Raw strings"&gt;Raw strings&lt;/h2&gt;
+ &lt;p&gt;And, of course, being able to shamelessly use backslashes inside strings is something you ask of a windows shell. I want to be able to type something like:&lt;/p&gt;
+ &lt;pre class="brush: factor"&gt;r| \\Server\share| directory-files&lt;/pre&gt;
+ &lt;p&gt; Notice the space after the first vertical bar. This is typical of Factor, you&amp;rsquo;ll see why in a moment.&lt;/p&gt;
+ &lt;p&gt;As a Factor newbie, there are two things you can do. One is to RTFM, which is extensive and well-written:&lt;/p&gt;
+ &lt;blockquote&gt;
+  &lt;p&gt;  The Factor parser follows a simple recursive-descent design. The parser reads successive tokens from the input; if the token identifies a number or an ordinary word, it is added to an accumulator vector. Otherwise if the token identifies a parsing word, the parsing word is executed immediately.&lt;/p&gt;&lt;/blockquote&gt;
+ &lt;p&gt;The other one is to check the implementation of something close to what&amp;rsquo;s intended. This is extremely easy in Factor, since most of the Factor libraries are implemented in Factor itself and the help system lets you navigate through the definitions. The solution presented here is inspired by the regex-introducing parsing word &lt;a href="http://docs.factorcode.org/content/word-R__slash__,regexp.html"&gt;&lt;code&gt;R/&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
+ &lt;p&gt;So it looks like we&amp;rsquo;ll need to introduce a word that will hook up to a function whose responsibility will be to push a string into the accumulator. Something like:&lt;/p&gt;
+ &lt;pre class="brush: factor"&gt;SYNTAX: r| CHAR: | parsing-raw ;&lt;/pre&gt;
+ &lt;p&gt; This means that the parser will immediately evaluate &lt;code&gt;124 parsing-raw&lt;/code&gt; after seeing the introductory &lt;code&gt;r|&lt;/code&gt;. since this introductory word is handled by the default lexer and parser, there needs to be a space after it for Factor to process the end of word. This might seem unnatural if you do not know Factor, but it is consistent with the rest of the language.&lt;/p&gt;
+ &lt;p&gt;124 is the ascii code for the vertical bar, which will act as a terminator of the string to parse. Passing the terminator as a parameter will make things easier if we decide to change the separators someday.&lt;/p&gt;
+ &lt;h2 id="The lexer"&gt;The lexer&lt;/h2&gt;
+ &lt;p&gt;For our purpose, we cannot work at the parser level: we don&amp;rsquo;t deal with words, numbers or already-constructed strings. If we want to construct a Factor string in a different way, we&amp;rsquo;ll have to call the lexer directly. The lexer is stored in a &lt;a href="http://docs.factorcode.org/content/article-namespaces.html"&gt;dynamic variable&lt;/a&gt; named &lt;code&gt;lexer&lt;/code&gt;.&lt;/p&gt;
+ &lt;pre class="brush: factor"&gt;: parsing-raw ( accum end -- accum )
+        lexer get take-until suffix! ;&lt;/pre&gt;
+ &lt;p&gt; &lt;code&gt;parsing raw&lt;/code&gt; is reponsible for taking input until the &lt;code&gt;end&lt;/code&gt; character (124) is reached, and then suffixing the accumulator with the newly parsed string.&lt;/p&gt;
+ &lt;p&gt;The actual parsing is done in the &lt;code&gt;take-until&lt;/code&gt; word:&lt;/p&gt;
+ &lt;pre class="brush: factor"&gt;: take-until ( end lexer -- string )
+        [
+                [ 1 + ] dip
+                [ index-from ] 2keep
+                [ swapd subseq ]
+                [ 2drop 1 + ] 3bi
+        ] change-lexer-column ;&lt;/pre&gt;
+ &lt;p&gt; The word &lt;code&gt;change-lexer-column&lt;/code&gt; calls its quotation with the column and the line text of the lexer at that moment. The first line, then, just skips that blank we talked earlier following the introductory word &lt;code&gt;r|&lt;/code&gt;. The next two lines find the positon of the terminator (&lt;code&gt;index-from&lt;/code&gt;) and extract the string accordingly (&lt;code&gt;subseq&lt;/code&gt;). At the end of the quotation &lt;code&gt;change-lexer-column&lt;/code&gt; finds the new lexer column at the top of the stack, and just below it lies our return value: the raw string.&lt;/p&gt;
+ &lt;p&gt;Let&amp;rsquo;s give it a try:&lt;/p&gt;
+ &lt;pre class="brush: factor"&gt;IN: scratchpad r| \\Server\share|
+
+--- Data stack:
+"\\\\Server\\share"
+IN: scratchpad &lt;/pre&gt;
+ &lt;h2 id="Conclusion"&gt;Conclusion&lt;/h2&gt;
+ &lt;p&gt;Extending Factor&amp;rsquo;s syntax is quite straightforward. The linked documentation system and source code browser are an extremely helpful resource to learn the language.&lt;/p&gt;
+ &lt;p&gt;As pointed out after a question in the &lt;a href="http://dir.gmane.org/gmane.comp.lang.factor.general"&gt;mailing list&lt;/a&gt;, my solution lacks a way to escape characters. Check out the reference at the end of the article to see how Factor&amp;rsquo;s &amp;ldquo;real&amp;rdquo; string parser deals with them.&lt;/p&gt;
+ &lt;h2 id="Resources"&gt;Resources&lt;/h2&gt;
+ &lt;ul&gt;
+  &lt;li&gt;Slava&amp;rsquo;s post on &lt;a href="http://factor-language.blogspot.com.es/2009/09/survey-of-domain-specific-languages-in.html"&gt;writing DSLs on Factor&lt;/a&gt; gives a nice overview of Factor&amp;rsquo;s self-modifying capabilities.&lt;/li&gt;
+  &lt;li&gt;The &lt;a href="http://docs.factorcode.org/content/article-parsing-words.html"&gt;docs&lt;/a&gt; of course.&lt;/li&gt;
+  &lt;li&gt;The &lt;a href="https://github.com/slavapestov/factor/blob/master/core/strings/parser/parser.factor"&gt;string parser code&lt;/a&gt;, to see how &amp;ldquo;real&amp;rdquo; Factor strings are parsed. Interesting to see how Factor deals with escape characters. &lt;/li&gt;&lt;/ul&gt;&lt;/html&gt;</description></item>
+  <item>
+   <title>Raw Strings in Racket</title>
+   <link>http://www.example.com/blog/2011/08/07/raw-strings-in-racket/?utm_source=all&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2011-08-07-raw-strings-in-racket</guid>
+   <pubDate>Sun, 07 Aug 2011 00:00:00 CEST</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F08%2F07%2Fraw-strings-in-racket%2F" height="1" width="1" /&gt;
+ &lt;p&gt;One of the features I missed from the outstanding lisp dialect &lt;a href="http://www.racket-lang.org/"&gt;Racket&lt;/a&gt; (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language&amp;rsquo;s ability to extend its own syntax.  &lt;/p&gt;
+ &lt;p&gt;&lt;strong&gt;2011-08-14 UPDATE:&lt;/strong&gt; This article can be used as a tutorial for implementing readtable extensions to Racket. If you just want the functionality, you can achieve it with the &lt;code&gt;at-exp&lt;/code&gt; language, already included in Racket&amp;rsquo;s distribution. Just skip to the &lt;a href="#at-exp"&gt;at-exp&lt;/a&gt; section at the end of this tutorial to see how.&lt;/p&gt;
+ &lt;h1 id="The problem"&gt;The problem&lt;/h1&gt;
+ &lt;p&gt;This will probably sound familiar to any of you using windows paths or regexes in a language with strings supporting backslash escape sequences. Essentially, the problem is that instead of writing, for example:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(directory-list "\\MACHINE\Share\directory")&lt;/pre&gt;
+ &lt;p&gt; You need to write:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(directory-list "\\\\MACHINE\\Share\\directory")&lt;/pre&gt;
+ &lt;p&gt; Not an awful amount of work, but if you got to appreciate python&amp;rsquo;s convenient &lt;code&gt;r''&lt;/code&gt; and C# &lt;code&gt;@""&lt;/code&gt; syntax, then you&amp;rsquo;d probably miss the feature. &lt;/p&gt;
+ &lt;h1 id="The plan"&gt;The plan&lt;/h1&gt;
+ &lt;p&gt;Racket is extensible by design. When we run a racket program, there are several stages involved:&lt;/p&gt;
+ &lt;ol&gt;
+  &lt;li&gt;First, a &lt;em&gt;reader&lt;/em&gt; layer turns a stream of characters into a kind of&lt;/li&gt;&lt;/ol&gt;
+ &lt;p&gt;AST. Since racket is a lisp, this AST is, of course, made up of s-expressions. But in Racket&amp;rsquo;s case, they&amp;rsquo;re a particular kind of s-expressions which contain extra information on their lexical scope and their source location, and are called &lt;em&gt;syntax objects&lt;/em&gt;.&lt;/p&gt;
+ &lt;ol&gt;
+  &lt;li&gt;After that, those syntax objects are further expanded through the&lt;/li&gt;&lt;/ol&gt;
+ &lt;p&gt;macro layer.&lt;/p&gt;
+ &lt;p&gt;The extension architecture in Racket will let you &amp;ldquo;plug&amp;rdquo; your extension into existing languages, so in the process of creating a new language you can (and usually will) build upon existing features.&lt;/p&gt;
+ &lt;p&gt;Our purpose, then, is to build a new language on top of racket by tuning the reader so that we can pass strings verbatim to the expander layer.&lt;/p&gt;
+ &lt;h1 id="The reader extension"&gt;The reader extension&lt;/h1&gt;
+ &lt;p&gt;Racket provides a standard way to extend the reader by writing the so called &lt;em&gt;reader extensions&lt;/em&gt;. Those are modules that implement the &lt;code&gt;read&lt;/code&gt; and &lt;code&gt;read-syntax&lt;/code&gt; functions. Remember lisp is code-as-data? &lt;code&gt;read&lt;/code&gt; is called when forms are to be used as data, and can return any kind of value; &lt;code&gt;read-syntax&lt;/code&gt; is called when forms are to be interpreted as code, since its output is a syntax object. Apart from the source location and scope, their behaviour should be equivalent not to mislead the users, so you can implement &lt;code&gt;read&lt;/code&gt; from &lt;code&gt;read-syntax&lt;/code&gt; just by stripping the lexical information.&lt;/p&gt;
+ &lt;p&gt;The implementation is listed below:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(require syntax/readerr)
+(provide read read-syntax)
+
+(define (read in)
+  (syntax-&amp;gt;datum (read-syntax #f in)))
+
+(define (read-syntax src in)
+  
+  (define opening-char (read-char in))
+  (define closing-str (case opening-char
+                         [(#\() "\\)"]
+                         [(#\[) "\\]"]
+                         [(#\{) "\\}"]
+                         [else (string opening-char)]))
+  
+  (define regex (pregexp (string-append "^.*?" closing-str)))
+  
+  (define-values (line col pos) (port-next-location in))
+  
+  (define raw-str (regexp-match regex in))
+  
+  (unless raw-str 
+    (raise-read-error "bad raw string syntax"
+                      src line col pos
+                      (- (file-position in) pos)))
+  
+  (define (strip-last-char s)
+    (substring s 0 (- (string-length s) 1)))
+
+  (define (to-syntax v)
+    (datum-&amp;gt;syntax #f ; lexical context. read-syntax should have no lexical context
+                   v; Value
+                   (vector src ; File, normally syntax-source
+                           line  ; line
+                           col  ; column
+                           pos  ; character since beginning of source
+                           (string-length v)  ; the span (width)
+                           ))) ; check location info
+  
+  (to-syntax  (strip-last-char (bytes-&amp;gt;string/locale (car raw-str)))))&lt;/pre&gt;
+ &lt;p&gt; If you name the above module as &lt;code&gt;reader_extension.rkt&lt;/code&gt;, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending &lt;code&gt;#reader"reader_extension.rkt"&lt;/code&gt;. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it&amp;rsquo;s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.&lt;/p&gt;
+ &lt;p&gt;See these rackunit tests for an example:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(require rackunit)
+(check-equal? #reader"reader_extension.rkt"(\\TEST\One) 
+              "\\\\TEST\\One")
+
+(check-equal? #reader"reader_extension.rkt"_\test\no\escape_ 
+              "\\test\\no\\escape")&lt;/pre&gt;
+ &lt;h1 id="The readtable hook"&gt;The readtable hook&lt;/h1&gt;
+ &lt;p&gt;While the above fully works, It may not save much typing having to write &lt;code&gt;#reader"reader_extension.rkt"&lt;/code&gt; instead of manually backslashing the string. It would be more convenient to just use one character, for example &lt;code&gt;$&lt;/code&gt;, like this:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(directory-list $(\\SERVER\Share))&lt;/pre&gt;
+ &lt;p&gt; Fortunately, that&amp;rsquo;s pretty easy: the racket reader is implemented as a recursive descent parser, and you can hook your own functions to call back when the parser sees a character. This association between characters and callbacks is known as the readtable. &lt;/p&gt;
+ &lt;p&gt;The readtable has a dynamic scope (it&amp;rsquo;s a &lt;code&gt;parameter&lt;/code&gt;), and every call to the &lt;code&gt;read&lt;/code&gt; and &lt;code&gt;read-syntax&lt;/code&gt; functions is performed in the context of a readtable. There is, of course, a starting default readtable in case the user didn&amp;rsquo;t specify one.&lt;/p&gt;
+ &lt;h1 id="Using the extension as a language"&gt;Using the extension as a language&lt;/h1&gt;
+ &lt;p&gt;The other drawback of using the &lt;code&gt;#reader"reader_extension.rkt"&lt;/code&gt; prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;#lang with-raw-string racket #\%
+(regexp-split (pregexp %'\s') "two fields")&lt;/pre&gt;
+ &lt;p&gt; Meaning that you add raw string syntax on top of the &lt;code&gt;racket&lt;/code&gt; language with &lt;code&gt;%&lt;/code&gt; as your readtable character.&lt;/p&gt;
+ &lt;h1 id="The syntax-module/reader language"&gt;The syntax-module/reader language&lt;/h1&gt;
+ &lt;p&gt;Fortunately, both problems can be solved by using the syntax/module-reader language, which is a helper language for installing your own languages into a Racket distribution.&lt;/p&gt;
+ &lt;p&gt;All you need to do is locate the collects dir &lt;code&gt;(find-user-collects-dir)&lt;/code&gt; and place the &amp;ldquo;reader_extension.rkt&amp;rdquo; in a subdirectory called &lt;code&gt;with-raw-string/lang&lt;/code&gt; together with a &lt;code&gt;reader.rkt&lt;/code&gt; with this contents:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(module reader syntax/module-reader
+  #:language read 
+  #:wrapper2 (lambda (in rd)
+               (parameterize ([current-readtable 
+                               (make-raw-str-readtable (read in))])
+                 (rd in)))
+  
+  (require syntax/readerr
+           (prefix-in raw: "reader_extension.rkt"))
+    
+  (define readtable-hook
+    (case-lambda
+      [(ch in)
+       (raw:read in)]
+      [(ch in src line col pos)
+       (raw:read-syntax src in)]))
+  
+  (define (make-raw-str-readtable c)
+    (make-readtable (current-readtable)
+                    c 'terminating-macro readtable-hook)))&lt;/pre&gt;
+ &lt;p&gt; The interesting points are:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;The &lt;code&gt;make-raw-str-readtable&lt;/code&gt; will create a readtable that will&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;call the &lt;code&gt;reader_extension&lt;/code&gt; functions with its character argument.&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;The &lt;code&gt;#:language&lt;/code&gt; keyword will let you specify the underlying&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;language. It can be a literal or a callback function. In this case we use the &lt;code&gt;read&lt;/code&gt; function as a callback, so that we read the underlying language from the input stream.&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;The &lt;code&gt;#:wrapper2&lt;/code&gt; callback will parameterize both &lt;code&gt;read&lt;/code&gt; and&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;&lt;code&gt;read-syntax&lt;/code&gt; with the quote-character enhanced readtable.  Note that the quoting char is also read from the input stream first.&lt;/p&gt;
+ &lt;p&gt;&lt;a name="at-exp"&gt; &lt;/a&gt; # UPDATE: The &lt;code&gt;at-exp&lt;/code&gt; language &lt;/p&gt;
+ &lt;p&gt;After posting a link to this tutorial to the &lt;code&gt;users@racket-lang.org&lt;/code&gt; mailing list (a very active and helpful list for Racket users), Eli Barzilay (one of Racket&amp;rsquo;s core developers) pointed out that the &lt;a href="http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp"&gt;at-exp&lt;/a&gt; language could be used to achieve the same results. This language acts at the reader level and was originally developed for &lt;a href="http://docs.racket-lang.org/scribble/index.html?q=scribble"&gt;scribble&lt;/a&gt; (a family of languages for writing textual content, such as racket&amp;rsquo;s documentation itself).&lt;/p&gt;
+ &lt;p&gt;Basically, &lt;code&gt;at-exp&lt;/code&gt; extends another language (passed in as a parameter, like the one in this tutorial), so that expressions of the form:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;@func{Text here}&lt;/pre&gt;
+ &lt;p&gt; make it to the expansion layer like&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(func "Text here")&lt;/pre&gt;
+ &lt;p&gt; Where text is read literally (no backslash substitution). So here&amp;rsquo;s a way to achieve the same functionality we expected just by what&amp;rsquo;s already provided by Racket:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;#lang at-exp racket
+(define r string-append)
+(display @r{...nearly free text here...})&lt;/pre&gt;
+ &lt;p&gt; When using &lt;strong&gt;DrRacket&lt;/strong&gt;, you can press the &lt;em&gt;Macro Stepper&lt;/em&gt; button to see how the above is read:&lt;/p&gt;
+ &lt;pre class="brush: racket"&gt;(module anonymous-module racket
+  (#%module-begin
+   (define r string-append)
+   (display (r "...nearly free text here..."))))&lt;/pre&gt;
+ &lt;p&gt; Of course, the &lt;code&gt;r&lt;/code&gt; is there just to make the syntax shorter... you could just use &lt;code&gt;string-append&lt;/code&gt; each time. There is also another way to pass parameters to the &lt;code&gt;@&lt;/code&gt; functions, which is not relevant here, through &lt;code&gt;[]&lt;/code&gt;. Check the &lt;a href="http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp"&gt;docs&lt;/a&gt; for the details.&lt;/p&gt;
+ &lt;h1 id="Conclusions"&gt;Conclusions&lt;/h1&gt;
+ &lt;p&gt;You see how easy it is to add new features on top of the Racket language. How many languages do you know that you can modify to match your needs in this way?&lt;/p&gt;
+ &lt;p&gt;BTW, The above code is available at &lt;a href="http://github.com/jarnaldich/with-raw-string"&gt;github&lt;/a&gt;.&lt;/p&gt;
+ &lt;h1 id="Further Reading"&gt;Further Reading&lt;/h1&gt;
+ &lt;p&gt;Check out &lt;a href="http://docs.racket-lang.org/guide/languages.html"&gt;the excellent Racket documentation&lt;/a&gt; on creating new languages for racket. Seriously, the racket documentation system is as impressive as Racket itself.&lt;/p&gt;
+ &lt;p&gt;Check out &lt;a href="http://hashcollision.org/brainfudge/"&gt;This article&lt;/a&gt; for a more complete example on how to design a Turing-complete (but maybe not that useful) language in Racket.&lt;/p&gt;
+ &lt;p&gt;Check out &lt;a href="http://matt.might.net/articles/implementing-a-programming-language/"&gt;This other article&lt;/a&gt; to see how to develop an interpreter for two small languages, but without using Racket&amp;rsquo;s language extension mechanisms (evaluation is performed at run-time, through an eval function).&lt;/p&gt;&lt;/html&gt;</description></item>
+  <item>
+   <title>Run Legacy Apps as Windows Services</title>
+   <link>http://www.example.com/blog/2011/07/13/run-legacy-apps-as-windows-services/?utm_source=all&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2011-07-13-run-legacy-apps-as-windows-services</guid>
+   <pubDate>Wed, 13 Jul 2011 00:00:00 CEST</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F13%2Frun-legacy-apps-as-windows-services%2F" height="1" width="1" /&gt;
+ &lt;p&gt;Although the right thing to do when programming a windows service is to use Microsoft&amp;rsquo;s API from the very beginning, it may also be desirable to run a regular executable as a service. &lt;/p&gt;
+ &lt;p&gt;A typical candidate would be a legacy TCP server, so that you get:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;automatic startup without login.&lt;/li&gt;
+  &lt;li&gt;integration with third-party monitoring apps.&lt;/li&gt;
+  &lt;li&gt;the ability to define failure recovery policies.&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;Microsoft had already noticed this, so they provide the executable &lt;a href="http://support.microsoft.com/kb/137890"&gt;SRVANY&lt;/a&gt; as part of the &lt;strong&gt;Windows Resource Kit&lt;/strong&gt;; but sometimes installing the whole resource kit may not be an option, specially in a production server. &lt;/p&gt;
+ &lt;p&gt;It would be nicer to have a small application you could just xcopy-deploy that would allow you to install, remove and update the properties of your service candidate.&lt;/p&gt;
+ &lt;h1 id="The solution"&gt;The solution&lt;/h1&gt;
+ &lt;p&gt;Here&amp;rsquo;s where &lt;a href="http://www.cygwin.com/"&gt;CygWin&amp;rsquo;s&lt;/a&gt; little {{cygrunsrv}} comes handy. Notice that, although it behaves nicely with cygwin apps, it can be used with &lt;strong&gt;any&lt;/strong&gt; Win32 executable.&lt;/p&gt;
+ &lt;p&gt;To use it, you just need to put the files &lt;code&gt;cygrunsrv.exe&lt;/code&gt; and &lt;code&gt;cygwin1.dll&lt;/code&gt; in the same directory and go. Unfortunately, both files lie in different packages and cannot, AFAIK, be downloaded on their own, so the first time you&amp;rsquo;ll have to download and uncompress the files {{cygrunsrv-1.34.1.tar.bz2}} and {{cygwin-1.7.9-1.tar.bz2}}, (version may differ in the future) from whatever mirror is most suitable for you. &lt;/p&gt;
+ &lt;p&gt;The full documentation for this tool is &lt;a href="http://web.mit.edu/cygwin/cygwin_v1.3.2/usr/doc/Cygwin/cygrunsrv.README"&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;/html&gt;</description></item>
+  <item>
+   <title>Blogging with Jekyll</title>
+   <link>http://www.example.com/blog/2011/07/01/blogging-with-jekyll/?utm_source=all&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2011-07-01-blogging-with-jekyll</guid>
+   <pubDate>Fri, 01 Jul 2011 00:00:00 CEST</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F01%2Fblogging-with-jekyll%2F" height="1" width="1" /&gt;
+ &lt;p&gt;... or, &amp;ldquo;from static to dynamic and back again&amp;rdquo;.&lt;/p&gt;
+ &lt;p&gt;I&amp;rsquo;ve finally decided to set-up a new technical blog. I think one of the main reasons it took me so long to start was that I couldn&amp;rsquo;t find an engine that matched my taste. Ok... as a coder, my taste is not exactly that of a final user.&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;I didn&amp;rsquo;t want to pay. I woult have felt a bit dumb knowing I could be using something like &lt;a href="http://www.wordpress.com"&gt;WordPress&lt;/a&gt; or &lt;a href="http://www.blogger.com"&gt;Blogger&lt;/a&gt; for free even if they&amp;rsquo;re not exactly what I&amp;rsquo;m looking for.&lt;/li&gt;
+  &lt;li&gt;I don&amp;rsquo;t think storing pages in a relational DB is the smartest thing to do. Relational DBs are for structured data, not documents. &lt;/li&gt;
+  &lt;li&gt;I want to be able to use the tools I learned to love as a coder in my posts. After all, It&amp;rsquo;s all about text, right? I want versioning, regexp searches, and all that good old unix tools for text processing.&lt;/li&gt;
+  &lt;li&gt;I&amp;rsquo;d rather die than use a web-based editor.&lt;/li&gt;
+  &lt;li&gt;I want to be able to produce high quality, standards compliant and easily modifyable html... but authoring in a more human-friendly markup, of course... &lt;/li&gt;
+  &lt;li&gt;I don&amp;rsquo;t want to be stuck to a system once I&amp;rsquo;ve started. What I care most is content. I want to be able to migrate my posts whenever I want. &lt;/li&gt;
+  &lt;li&gt;The system should be elegant, not a bunch of scripts tied together.&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;After reading &lt;a href="http://tom.preston-werner.com/2008/11/17/blogging-like-a-hacker.html"&gt;this post&lt;/a&gt;, it became clear that what I wanted was a &lt;em&gt;static&lt;/em&gt; site generator.&lt;/p&gt;
+ &lt;p&gt;Static? But that&amp;rsquo;s soooo 1990s... well yes... and no. I&amp;rsquo;ve you&amp;rsquo;ve ever tried to roll your own blog engine (a common web framework learning exercice), and got to the point of optimization, you may have come to realize that you can cache most, if not all, your content... mmmmm... This is certainly oversimplifying, but you get the point:&lt;/p&gt;
+ &lt;p&gt;DYNAMIC + A WHOLE LOT OF CACHING = STATIC&lt;/p&gt;
+ &lt;p&gt;The other, probably most relevant, difference from the 90s is the mashups culture. Your web app can rely on third party services for its dynamic parts. (IMHO, Even if you are able to serve dynamic content, it&amp;rsquo;s still interesting to use some of those services).&lt;/p&gt;
+ &lt;p&gt;Now that you know the &lt;em&gt;whys&lt;/em&gt;, let&amp;rsquo;s talk about the &lt;em&gt;hows&lt;/em&gt;.&lt;/p&gt;
+ &lt;h2 id="Jekyll"&gt;Jekyll&lt;/h2&gt;
+ &lt;p&gt;There are several static page generators out there (just Google for them). I feel confident with Ruby, but the key point here was &lt;a href="http://pages.github.com/"&gt;Github Pages&lt;/a&gt; having automatic &lt;a href="http://jekyllrb.com/"&gt;Jekyll&lt;/a&gt; processing (no suprise: jekyll&amp;rsquo;s author is one of the Github founders). &lt;/p&gt;
+ &lt;p&gt;I must admit I am curious about &lt;a href="http://jaspervdj.be/hakyll/"&gt;Hakyll&lt;/a&gt; too... &lt;/p&gt;
+ &lt;p&gt;With jekyll, you get:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;A full templating system based on markup authoring run through &lt;a href="http://www.liquidmarkup.org/"&gt;liquid&lt;/a&gt;-powered templates.&lt;/li&gt;
+  &lt;li&gt;Syntax highlighting (through) pygments. Just install it and run with the &lt;code&gt;--pygments&lt;/code&gt; option.&lt;/li&gt;
+  &lt;li&gt;Tagging (not directly, but easy to add).&lt;/li&gt;
+  &lt;li&gt;A content-based related posts feature.&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;Plus, of course, the possibility to store your blog at GitHub.&lt;/p&gt;
+ &lt;h2 id="Comments system"&gt;Comments system&lt;/h2&gt;
+ &lt;p&gt;There are some good reasons for using a third party comment system instead of your own (security, merging different sources, statistics...), even if you can serve dynamic content. For this blog I chose &lt;a href="http://disqus.com/"&gt;disqus&lt;/a&gt;, but there are others...&lt;/p&gt;
+ &lt;h2 id="Github"&gt;Github&lt;/h2&gt;
+ &lt;p&gt;Both the content and the templates for this blog are hosted at a Github free account, which will even let you redirect your domain. You can check the source code, fork the repo or whatever &lt;a href="https://github.com/jarnaldich/jarnaldich.github.com"&gt;here&lt;/a&gt;.&lt;/p&gt;
+ &lt;h2 id="Updates as of Feb 2013"&gt;Updates as of Feb 2013&lt;/h2&gt;
+ &lt;p&gt;Some other tools have sprung around github pages / Jekyll. If I started blogging now I&amp;rsquo;d probably check them out:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;&lt;a href="http://octopress.org"&gt;Octopress&lt;/a&gt; Is built on top of Jekyll to help hackers with the boring part of setting up a bloc (css, html templates, etc...).&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://jekyllbootstrap.org"&gt;Jekyll bootstrap&lt;/a&gt; Helps setting up a github pages account. There&amp;rsquo;s a new project by the same author that aims to be language agnostic called &lt;a href="http://ruhoh.com"&gt;ruhoh&lt;/a&gt;.&lt;/li&gt;&lt;/ul&gt;&lt;/html&gt;</description></item></channel></rss>
