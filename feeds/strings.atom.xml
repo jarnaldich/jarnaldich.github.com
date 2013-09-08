@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+ <title type="text">Joan Arnaldich's blog: Posts tagged 'strings'</title>
+ <link rel="self" href="http://www.example.com/feeds/strings.atom.xml" />
+ <link href="http://www.example.com/tags/strings.html" />
+ <id>urn:http-www-example-com:-tags-strings-html</id>
+ <updated>2013-09-09T00:00:00Z</updated>
+ <entry>
+  <title type="text">Haskell Gotchas: Strings</title>
+  <link rel="alternate" href="http://www.example.com/blog/2013/09/09/haskell-gotchas-strings/?utm_source=strings&amp;utm_medium=Atom" />
+  <id>urn:http-www-example-com:-blog-2013-09-09-haskell-gotchas-strings</id>
+  <published>2013-09-09T00:00:00Z</published>
+  <updated>2013-09-09T00:00:00Z</updated>
+  <author>
+   <name>Joan Arnaldich</name></author>
+  <content type="html">
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=strings&amp;amp;utm_medium=Atom&amp;amp;utm_campaign=%2Fblog%2F2013%2F09%2F09%2Fhaskell-gotchas-strings%2F" height="1" width="1" /&gt;
+ &lt;p&gt;I&amp;rsquo;ve been playing with &lt;a href="http://www.haskell.org"&gt;Haskell&lt;/a&gt; on and off for some time now. Let&amp;rsquo;s face it: it&amp;rsquo;s not an easy language to learn. I would agree with most people that part of the difficulty comes from its unique features (laziness, purity, etc...), and the abstractions that derive from them when facing real-world problems (Monads, Iteratees, etc...), but my point here is that there are other sources of confusion that keep misleading beginners like myself and that have nothing to do with all that.&lt;/p&gt;
+ &lt;p&gt;In fact, I can see a pattern in those &lt;a href="http://catb.org/~esr/jargon/html/G/gotcha.html"&gt;gotchas&lt;/a&gt;: Haskell often provides several tools for a particular task. It is (too) often the case that the one that&amp;rsquo;s most at hand, or that seems to be favored in the docs, is just not what a newbie would expect. I think this fact has an impact on the perception of first-time users, if they do not perservere enough to seek for alternatives.&lt;/p&gt;
+ &lt;p&gt;I am planning to write a series of posts on these gotchas, if only to prevent myself from falling into the same traps the next time I decide to take on Haskell again, and in the hope they will be useful to other learners. Please mind that I have no valorative intetion whatsoever (no flames: it is not a Haskell WTF), and that this is not the work of a seasoned Haskeller: if you find any mistakes in these posts, please report so I can correct them and learn something.&lt;/p&gt;
+ &lt;h1 id="Strings"&gt;Strings&lt;/h1&gt;
+ &lt;p&gt;This is a paradigmatic case, and probably the reason for many newbies walking away from Haskell wondering how come a compiled language can perform &lt;a href="http://honza.ca/2012/10/haskell-strings"&gt;so much worse&lt;/a&gt; than, say, Python.&lt;/p&gt;
+ &lt;p&gt;To recap, Haskell has a &lt;code&gt;String&lt;/code&gt; type. Now, for any non-trivial text processing you can pretty much forget about it. In Haskell, the &lt;code&gt;String&lt;/code&gt; type is defined as a regular list of &lt;code&gt;Char&lt;/code&gt;, and if you&amp;rsquo;ve had some previous exposure to functional lists (with their &lt;code&gt;car&lt;/code&gt;s and &lt;code&gt;cdr&lt;/code&gt;s, &lt;code&gt;head&lt;/code&gt;s and &lt;code&gt;tail&lt;/code&gt;s, ...) you&amp;rsquo;ll know how different a beast they are from the sort of &lt;code&gt;char&lt;/code&gt;/&lt;code&gt;wchar&lt;/code&gt; array most newcomers would expect for a string implementation.&lt;/p&gt;
+ &lt;p&gt;Of course, Haskell ships with a bunch of modules designed to work as &lt;code&gt;String&lt;/code&gt; replacements in its standard library. By replacement I mean that the names of the functions are kept consistent so that, if you use qualified imports, it &lt;em&gt;should, in theory&lt;/em&gt; be easy to switch between them. Now, these modules not only change the underlying implementation of a string, but also provide the functions to perform IO according to the type, so they come in &lt;em&gt;strict IO&lt;/em&gt; and &lt;em&gt;lazy IO&lt;/em&gt; flavors: the &lt;em&gt;gotcha&lt;/em&gt; here is that this can dramatically change the &lt;em&gt;semantics&lt;/em&gt; of input/output on the importing module, so switching between them is not always that easy, &lt;em&gt;in practice&lt;/em&gt;.&lt;/p&gt;
+ &lt;p&gt;I have deribelately avoided to tackle the subtleties of lazy IO in this post (I may keep that for another gotcha). Take a look at &lt;a href="http://www.haskell.org/haskellwiki/Iteratee_I/O#The_problem_with_lazy_I.2FO"&gt;this&lt;/a&gt; if you can&amp;rsquo;t wait. At the moment, my advice for a newcomer would be to start with the strict versions, because they are closer to the behaviour you&amp;rsquo;d expect in most other languages.&lt;/p&gt;
+ &lt;p&gt;If you have already been doing IO in Haskell with &lt;code&gt;Strings&lt;/code&gt; and &lt;code&gt;System.IO&lt;/code&gt;, then you have already been doing &lt;em&gt;lazy&lt;/em&gt; IO, since it&amp;rsquo;s the default. When in doubt, you can always try both and see which one (if any) matches your performance expectations.&lt;/p&gt;
+ &lt;h2 id="The Basics"&gt;The Basics&lt;/h2&gt;
+ &lt;p&gt;Here&amp;rsquo;s what most Haskellers would recommend:&lt;/p&gt;
+ &lt;p&gt;&lt;strong&gt;If you do not care about Unicode&lt;/strong&gt;, use &lt;code&gt;Data.ByteString.Char8&lt;/code&gt;, which is a packed array of &lt;code&gt;Char8&lt;/code&gt; (bytes). The lazy variant is &lt;code&gt;Data.ByteString.Lazy.Char8&lt;/code&gt;. This will be enough if you can assume your input is in (a subset of) &lt;em&gt;latin-1&lt;/em&gt;. &lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;import qualified Data.ByteString.Char8 as B&lt;/pre&gt;
+ &lt;p&gt;or&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;import qualified Data.ByteString.Lazy.Char8 as B&lt;/pre&gt;
+ &lt;p&gt; &lt;strong&gt;If you care about Unicode&lt;/strong&gt;, go use &lt;code&gt;Data.Text.Text&lt;/code&gt;:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;import qualified Data.Text as T
+import qualified Data.Text.IO as TextIO&lt;/pre&gt;
+ &lt;p&gt; or&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.IO as TextIO&lt;/pre&gt;
+ &lt;p&gt; If you need regular expressions with Unicode, though, the thing gets a little more &lt;a href="http://stackoverflow.com/questions/14922579/haskell-regular-expressions-and-data-text"&gt;involved&lt;/a&gt;.&lt;/p&gt;
+ &lt;h2 id="Back and forth"&gt;Back and forth&lt;/h2&gt;
+ &lt;p&gt;Even if you use these types, you will still need &lt;code&gt;Prelude.String&lt;/code&gt; in your code: there are a lot of libraries which will expect and return &lt;code&gt;String&lt;/code&gt;s. As an example, the &lt;code&gt;FilePath&lt;/code&gt; type for file and directory manipulation is just an alias for &lt;code&gt;String&lt;/code&gt;. So converting from &lt;em&gt;packed&lt;/em&gt; &lt;code&gt;ByteArrays&lt;/code&gt; to &lt;em&gt;unpacked&lt;/em&gt; &lt;code&gt;String&lt;/code&gt;s is achived, not surprisingly, by the functions &lt;code&gt;pack&lt;/code&gt; and &lt;code&gt;unpack&lt;/code&gt;. In fact, using &lt;code&gt;String&lt;/code&gt; in your APIs, as long as they&amp;rsquo;re not too large, is one (the only?) sensible use for &lt;code&gt;Strings&lt;/code&gt;.&lt;/p&gt;
+ &lt;h2 id="Conclusions"&gt;Conclusions&lt;/h2&gt;
+ &lt;p&gt;Here&amp;rsquo;s my piece of advice:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;Avoid &lt;code&gt;Prelude.String&lt;/code&gt; for text processing, but bear in mind it is sort of standard when defining your APIs.&lt;/li&gt;
+  &lt;li&gt;If you care for Unicode, go for &lt;code&gt;Data.Text&lt;/code&gt;, if the latin-1 subset is enough for you, stick to &lt;code&gt;Data.ByteString&lt;/code&gt;, since regular expressions (and other tasks) are easier there.&lt;/li&gt;
+  &lt;li&gt;If you are starting and the performance is enough for your use-case, go for the strict IO. The behaviour is more predictable.&lt;/li&gt;&lt;/ul&gt;
+ &lt;p&gt;A final note: this is, by far, not the last word regarding &lt;code&gt;String&lt;/code&gt;s in Haskell. For example, there are abstractions that aim to solve the predictability issues problems of lazy IO while keeping performant (for example, &lt;a href="http://www.haskell.org/haskellwiki/Iteratee_I/O"&gt;Iteratees&lt;/a&gt; or &lt;a href="http://www.haskell.org/haskellwiki/Conduit"&gt;Conduits&lt;/a&gt;. I just think this is the bare minimum to be able to do text-processing in Haskell.&lt;/p&gt;&lt;/html&gt;</content></entry></feed>
