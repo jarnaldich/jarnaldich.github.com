@@ -269,7 +269,67 @@
  <h2 id="Back and forth">Back and forth</h2>
 
 
- <p>Even if you use these types, you will still need <code>Prelude.String</code> in your code: there are a lot of libraries which will expect and return <code>String</code>s. As an example, the <code>FilePath</code> type for file and directory manipulation is just an alias for <code>String</code>. So converting from <em>packed</em> <code>ByteArrays</code> to <em>unpacked</em> <code>String</code>s is achived, not surprisingly, by the functions <code>pack</code> and <code>unpack</code>. In fact, using <code>String</code> in your APIs, as long as they&rsquo;re not too large, is one (the only?) sensible use for <code>Strings</code>.</p>
+ <p>Even if you use these types, you will still need <code>Prelude.String</code> in your code: there are a lot of libraries which will expect and return <code>String</code>s. As an example, the <code>FilePath</code> type for file and directory manipulation is just an alias for <code>String</code>. Also, every string literal in your code will be parsed as a <code>String</code> by default (but see below), so converting from <em>packed</em> <code>ByteArrays</code> to <em>unpacked</em> <code>String</code>s is achived, not surprisingly, by the functions <code>pack</code> and <code>unpack</code>. In fact, using <code>String</code> in your APIs, as long as they&rsquo;re not too large, is one (the only?) sensible use for <code>Strings</code>.</p>
+
+
+ <p>For the <a href="http://www.haskell.org/ghc/">GHC</a> stack you can  avoid packing and unpacking string literals by using the <code>OverloadedStrings</code> pragma. Ie. instead of writing:</p>
+
+
+ <div class="brush: haskell">
+
+  <table class="sourcetable">
+
+   <tbody>
+
+    <tr>
+
+     <td class="linenos">
+
+      <div class="linenodiv">
+
+       <pre>1
+2</pre></div></td>
+
+     <td class="code">
+
+      <div class="source">
+
+       <pre><span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Text</span> <span class="k">as</span> <span class="n">T</span>
+<span class="nf">myFuncExpectingDataText</span> <span class="o">.</span> <span class="kt">T</span><span class="o">.</span><span class="n">pack</span> <span class="o">$</span> <span class="s">"Hello World!"</span>
+</pre></div>
+</td></tr></tbody></table>
+</div>
+
+
+ <p> you can add the pragma that makes the call to <code>T.pack</code> unnecessary:</p>
+
+
+ <div class="brush: haskell">
+
+  <table class="sourcetable">
+
+   <tbody>
+
+    <tr>
+
+     <td class="linenos">
+
+      <div class="linenodiv">
+
+       <pre>1
+2
+3</pre></div></td>
+
+     <td class="code">
+
+      <div class="source">
+
+       <pre><span class="cm">{-# LANGUAGE OverloadedStrings #-}</span>
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Text</span> <span class="k">as</span> <span class="n">T</span>
+<span class="nf">myFuncExpectingDataText</span> <span class="s">"Hello World!"</span>
+</pre></div>
+</td></tr></tbody></table>
+</div>
 
 
  <h2 id="Conclusions">Conclusions</h2>

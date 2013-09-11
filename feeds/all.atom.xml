@@ -38,7 +38,14 @@ import qualified Data.Text.IO as TextIO&lt;/pre&gt;
 import qualified Data.Text.Lazy.IO as TextIO&lt;/pre&gt;
  &lt;p&gt; If you need regular expressions with Unicode, though, the thing gets a little more &lt;a href="http://stackoverflow.com/questions/14922579/haskell-regular-expressions-and-data-text"&gt;involved&lt;/a&gt;.&lt;/p&gt;
  &lt;h2 id="Back and forth"&gt;Back and forth&lt;/h2&gt;
- &lt;p&gt;Even if you use these types, you will still need &lt;code&gt;Prelude.String&lt;/code&gt; in your code: there are a lot of libraries which will expect and return &lt;code&gt;String&lt;/code&gt;s. As an example, the &lt;code&gt;FilePath&lt;/code&gt; type for file and directory manipulation is just an alias for &lt;code&gt;String&lt;/code&gt;. So converting from &lt;em&gt;packed&lt;/em&gt; &lt;code&gt;ByteArrays&lt;/code&gt; to &lt;em&gt;unpacked&lt;/em&gt; &lt;code&gt;String&lt;/code&gt;s is achived, not surprisingly, by the functions &lt;code&gt;pack&lt;/code&gt; and &lt;code&gt;unpack&lt;/code&gt;. In fact, using &lt;code&gt;String&lt;/code&gt; in your APIs, as long as they&amp;rsquo;re not too large, is one (the only?) sensible use for &lt;code&gt;Strings&lt;/code&gt;.&lt;/p&gt;
+ &lt;p&gt;Even if you use these types, you will still need &lt;code&gt;Prelude.String&lt;/code&gt; in your code: there are a lot of libraries which will expect and return &lt;code&gt;String&lt;/code&gt;s. As an example, the &lt;code&gt;FilePath&lt;/code&gt; type for file and directory manipulation is just an alias for &lt;code&gt;String&lt;/code&gt;. Also, every string literal in your code will be parsed as a &lt;code&gt;String&lt;/code&gt; by default (but see below), so converting from &lt;em&gt;packed&lt;/em&gt; &lt;code&gt;ByteArrays&lt;/code&gt; to &lt;em&gt;unpacked&lt;/em&gt; &lt;code&gt;String&lt;/code&gt;s is achived, not surprisingly, by the functions &lt;code&gt;pack&lt;/code&gt; and &lt;code&gt;unpack&lt;/code&gt;. In fact, using &lt;code&gt;String&lt;/code&gt; in your APIs, as long as they&amp;rsquo;re not too large, is one (the only?) sensible use for &lt;code&gt;Strings&lt;/code&gt;.&lt;/p&gt;
+ &lt;p&gt;For the &lt;a href="http://www.haskell.org/ghc/"&gt;GHC&lt;/a&gt; stack you can  avoid packing and unpacking string literals by using the &lt;code&gt;OverloadedStrings&lt;/code&gt; pragma. Ie. instead of writing:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;import qualified Data.Text as T
+myFuncExpectingDataText . T.pack $ "Hello World!"&lt;/pre&gt;
+ &lt;p&gt; you can add the pragma that makes the call to &lt;code&gt;T.pack&lt;/code&gt; unnecessary:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;{-# LANGUAGE OverloadedStrings #-}
+import qualified Data.Text as T
+myFuncExpectingDataText "Hello World!"&lt;/pre&gt;
  &lt;h2 id="Conclusions"&gt;Conclusions&lt;/h2&gt;
  &lt;p&gt;Here&amp;rsquo;s my piece of advice:&lt;/p&gt;
  &lt;ul&gt;

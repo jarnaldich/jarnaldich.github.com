@@ -108,11 +108,30 @@ little more [involved](http://stackoverflow.com/questions/14922579/haskell-regul
 Even if you use these types, you will still need `Prelude.String` in
 your code: there are a lot of libraries which will expect and return
 `String`s. As an example, the `FilePath` type for file and directory
-manipulation is just an alias for `String`. So converting from
-_packed_ `ByteArrays` to _unpacked_ `String`s is achived, not
-surprisingly, by the functions `pack` and `unpack`. In fact, using
-`String` in your APIs, as long as they're not too large, is one (the
-only?) sensible use for `Strings`.
+manipulation is just an alias for `String`. Also, every string literal
+in your code will be parsed as a `String` by default (but see below),
+so converting from _packed_ `ByteArrays` to _unpacked_ `String`s is
+achived, not surprisingly, by the functions `pack` and `unpack`. In
+fact, using `String` in your APIs, as long as they're not too large,
+is one (the only?) sensible use for `Strings`.
+
+For the [GHC](http://www.haskell.org/ghc/) stack you can 
+avoid packing and unpacking string literals by using the
+`OverloadedStrings` pragma. Ie. instead of writing:
+
+```haskell
+import qualified Data.Text as T
+myFuncExpectingDataText . T.pack $ "Hello World!"
+```
+
+you can add the pragma that makes the call to `T.pack` unnecessary:
+
+```haskell
+{-# LANGUAGE OverloadedStrings #-}
+import qualified Data.Text as T
+myFuncExpectingDataText "Hello World!"
+```
+
 
 ## Conclusions
 
