@@ -33,10 +33,91 @@ post, please think of the `GHC` stack.
 
 Like in many other high-level languages, the default types in GHC are
 *boxed*, meaning that they are represented by a pointer to a object in
-the heap, rather than a primitive type itself. 
-
+the heap, rather than a primitive type itself. The use of boxed types
+adds one level of indirection and thus has an impact on performance
+because of the extra allocation and the loss of locality. `repa`, of
+course, uses unboxed types for efficiency.
 
 You can read more about unboxed types [in the manual](http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html).
+
+### Stream fusion
+
+Consider a function like this:
+
+```haskell
+squareAddTwo :: [Int] -> Int
+squareAddTwo = sum . map (+2) . map (*3) 
+```
+
+It is supposed to multiply each element in an integer list by three,
+add two, and then sum up all the numbers in the list. A naive
+implementation of the above would use 3 lists: the input list and two
+intermediate lists for storing the result of the two `map` operations.
+Now, with stream fusion, equational laws are applied to get rid of
+these intermediate structures in a process called deforestation. The
+above could be translated into something like:
+
+```haskell
+myFoldingSquareAddTwo = foldl' (\x y -> x + (y*3 + 2)) 0
+```
+
+Note that recent version of GHC will perform fusion on regular lists,
+so you can take advantage of fusion provided you implement your
+functions on lists with the usal functions (`map`, `fold`, etc...). If
+you implement your own recursive functions, then GHC will *not* fuse.
+Here is a snippet that you can play with. I encourage you to try what
+is the largest value of `n` for which this program correctly
+terminates:
+
+```haskell
+module Main where
+import System.Environment
+import Data.List (foldl')
+    
+myMap f [] = []
+myMap f (h:t) = f h : myMap f t
+
+mySum [] = 0
+mySum (h:t) = h + mySum t
+
+mySquareAddTwo = mySum . myMap  (+2) . myMap (*2) 
+
+squareAddTwo :: [Int] -> Int
+squareAddTwo = sum . map (+2) . map (*3) 
+
+myFoldingSquareAddTwo :: [Int] -> Int
+myFoldingSquareAddTwo = foldl' (\x y -> x + (y*3 + 2)) 0
+
+main = do
+  [n] <- getArgs
+  print $ squareAddTwo [1..read n :: Int]
+  print $ myFoldingSquareAddTwo [1..read n :: Int]        
+  print $ mySquareAddTwo [1..read n :: Int]  
+```
+
+### Automatic parallelism
+
+Repa provides a set of combinators for creating and manipulating
+arrays. The operations needed to build an array are described
+declaratively in a first step (creating a so-called *delayed* array),
+and then the array is later materialized (which will give an *unboxed*
+array).
+
+This double process allows for `repa` not only to fuse away the
+intermediate structures, but also to perform the required data
+dependency analysis prior to parallelizing the computation. 
+
+Hopefully, the Voronoi example will help you understand this process.
+
+
+
+
+
+
+
+
+Stream fusion is a technique for avoiding the extra allocation that a
+naive implementation would 
 
 
 ## The Source
@@ -48,3 +129,5 @@ You can read more about unboxed types [in the manual](http://www.haskell.org/ghc
 ```
 
 ## References
+
+asdf
