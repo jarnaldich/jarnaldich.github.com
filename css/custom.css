@@ -15,3 +15,8 @@ pre {
 p {
     text-align: justify;
 }
+
+blockquote p {
+    font-size: 16px;
+    font-style: italic;
+}
