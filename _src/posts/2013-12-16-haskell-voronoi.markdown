@@ -1,6 +1,6 @@
-    Title: Parallelizing Voronoi in Haskell with repa.
+    Title: Parallel Voronoi in Haskell
     Date: 2013-12-16T00:00:00
-    Tags: haskell, gotchas, strings, DRAFT
+    Tags: haskell, voronoi, repa, parallel, DRAFT
 
 I recently bought a copy of *Parallel and Concurrent Programming in
 Haskell*, by Simon Marlow, also available online
@@ -61,13 +61,12 @@ above could be translated into something like:
 myFoldingSquareAddTwo = foldl' (\x y -> x + (y*3 + 2)) 0
 ```
 
-Note that recent version of GHC will perform fusion on regular lists,
-so you can take advantage of fusion provided you implement your
-functions on lists with the usal functions (`map`, `fold`, etc...). If
-you implement your own recursive functions, then GHC will *not* fuse.
-Here is a snippet that you can play with. I encourage you to try what
-is the largest value of `n` for which this program correctly
-terminates:
+Note that recent versions of GHC have deforestation built-in for
+regular lists, so you can take advantage of fusion provided you stick
+to the old suspects: `map`, `fold`, etc... If you implement your own
+recursive functions, then GHC will *not* be able to fuse. Here is a
+snippet that you can play with. I encourage you to try what is the
+largest value of `n` for which this program correctly terminates:
 
 ```haskell
 module Main where
@@ -109,15 +108,18 @@ dependency analysis prior to parallelizing the computation.
 
 Hopefully, the Voronoi example will help you understand this process.
 
+## Voronoi
 
+Quoting from the [wikipedia](http://en.wikipedia.org/wiki/Voronoi_diagram):
 
+> In mathematics, a Voronoi diagram is a way of dividing space into a
+> number of regions. A set of points (called seeds, sites, or
+> generators) is specified beforehand and for each seed there will be a
+> corresponding region consisting of all points closer to that seed than
+> to any other. The regions are called Voronoi cells
 
+So we are trying to get a pretty picture like this:
 
-
-
-
-Stream fusion is a technique for avoiding the extra allocation that a
-naive implementation would 
 
 
 ## The Source
