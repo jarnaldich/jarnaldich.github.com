@@ -4,14 +4,14 @@
   <title>Joan Arnaldich's blog: Posts tagged 'lisp'</title>
   <description>Joan Arnaldich's blog: Posts tagged 'lisp'</description>
   <link>http://www.example.com/tags/lisp.html</link>
-  <lastBuildDate>Sun, 07 Aug 2011 00:00:00 CEST</lastBuildDate>
-  <pubDate>Sun, 07 Aug 2011 00:00:00 CEST</pubDate>
+  <lastBuildDate>Sun, 07 Aug 2011 00:00:00 CET</lastBuildDate>
+  <pubDate>Sun, 07 Aug 2011 00:00:00 CET</pubDate>
   <ttl>1800</ttl>
   <item>
    <title>Raw Strings in Racket</title>
    <link>http://www.example.com/blog/2011/08/07/raw-strings-in-racket/?utm_source=lisp&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2011-08-07-raw-strings-in-racket</guid>
-   <pubDate>Sun, 07 Aug 2011 00:00:00 CEST</pubDate>
+   <pubDate>Sun, 07 Aug 2011 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=lisp&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F08%2F07%2Fraw-strings-in-racket%2F" height="1" width="1" /&gt;
  &lt;p&gt;One of the features I missed from the outstanding lisp dialect &lt;a href="http://www.racket-lang.org/"&gt;Racket&lt;/a&gt; (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language&amp;rsquo;s ability to extend its own syntax.  &lt;/p&gt;

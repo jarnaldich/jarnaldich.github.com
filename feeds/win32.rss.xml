@@ -4,14 +4,14 @@
   <title>Joan Arnaldich's blog: Posts tagged 'win32'</title>
   <description>Joan Arnaldich's blog: Posts tagged 'win32'</description>
   <link>http://www.example.com/tags/win32.html</link>
-  <lastBuildDate>Wed, 13 Jul 2011 00:00:00 CEST</lastBuildDate>
-  <pubDate>Wed, 13 Jul 2011 00:00:00 CEST</pubDate>
+  <lastBuildDate>Wed, 13 Jul 2011 00:00:00 CET</lastBuildDate>
+  <pubDate>Wed, 13 Jul 2011 00:00:00 CET</pubDate>
   <ttl>1800</ttl>
   <item>
    <title>Run Legacy Apps as Windows Services</title>
    <link>http://www.example.com/blog/2011/07/13/run-legacy-apps-as-windows-services/?utm_source=win32&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2011-07-13-run-legacy-apps-as-windows-services</guid>
-   <pubDate>Wed, 13 Jul 2011 00:00:00 CEST</pubDate>
+   <pubDate>Wed, 13 Jul 2011 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=win32&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F13%2Frun-legacy-apps-as-windows-services%2F" height="1" width="1" /&gt;
  &lt;p&gt;Although the right thing to do when programming a windows service is to use Microsoft&amp;rsquo;s API from the very beginning, it may also be desirable to run a regular executable as a service. &lt;/p&gt;

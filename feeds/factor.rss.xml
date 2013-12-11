@@ -4,14 +4,14 @@
   <title>Joan Arnaldich's blog: Posts tagged 'factor'</title>
   <description>Joan Arnaldich's blog: Posts tagged 'factor'</description>
   <link>http://www.example.com/tags/factor.html</link>
-  <lastBuildDate>Sun, 24 Feb 2013 00:00:00 CEST</lastBuildDate>
-  <pubDate>Sun, 24 Feb 2013 00:00:00 CEST</pubDate>
+  <lastBuildDate>Sun, 24 Feb 2013 00:00:00 CET</lastBuildDate>
+  <pubDate>Sun, 24 Feb 2013 00:00:00 CET</pubDate>
   <ttl>1800</ttl>
   <item>
    <title>Raw Strings in Factor </title>
    <link>http://www.example.com/blog/2013/02/24/raw-strings-in-factor/?utm_source=factor&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2013-02-24-raw-strings-in-factor</guid>
-   <pubDate>Sun, 24 Feb 2013 00:00:00 CEST</pubDate>
+   <pubDate>Sun, 24 Feb 2013 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=factor&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2013%2F02%2F24%2Fraw-strings-in-factor%2F" height="1" width="1" /&gt;
  &lt;p&gt;Ok, you may think I have a fixation with &lt;a href="blog/2011/08/07/raw-strings-in-racket/"&gt;raw strings&lt;/a&gt;, but if you&amp;rsquo;re like most developers and have used different languages through the years, you probably know the feeling of wanting to port your favourite features from language to language.&lt;/p&gt;

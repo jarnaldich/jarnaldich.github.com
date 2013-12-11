@@ -4,14 +4,75 @@
   <title>Joan Arnaldich's blog: All Posts</title>
   <description>Joan Arnaldich's blog: All Posts</description>
   <link>http://www.example.com/index.html</link>
-  <lastBuildDate>Mon, 09 Sep 2013 00:00:00 CEST</lastBuildDate>
-  <pubDate>Mon, 09 Sep 2013 00:00:00 CEST</pubDate>
+  <lastBuildDate>Mon, 16 Dec 2013 00:00:00 CET</lastBuildDate>
+  <pubDate>Mon, 16 Dec 2013 00:00:00 CET</pubDate>
   <ttl>1800</ttl>
+  <item>
+   <title>Parallel Voronoi in Haskell</title>
+   <link>http://www.example.com/blog/2013/12/16/parallel-voronoi-in-haskell/?utm_source=all&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2013-12-16-parallel-voronoi-in-haskell</guid>
+   <pubDate>Mon, 16 Dec 2013 00:00:00 CET</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2013%2F12%2F16%2Fparallel-voronoi-in-haskell%2F" height="1" width="1" /&gt;
+ &lt;p&gt;I recently bought a copy of &lt;em&gt;Parallel and Concurrent Programming in Haskell&lt;/em&gt;, by Simon Marlow, also available online &lt;a href="http://chimera.labs.oreilly.com/books/1230000000929"&gt;here&lt;/a&gt;. It&amp;rsquo;s a very good overview for anyone who (like me) has ever been confused by the wealth of different libraries and primitives for doing concurrency &amp;amp; parallelism in Haskell.&lt;/p&gt;
+ &lt;h2 id="Repa"&gt;Repa&lt;/h2&gt;
+ &lt;p&gt;A library I found particularly compelling was the &lt;a href="http://hackage.haskell.org/package/repa"&gt;repa&lt;/a&gt;. Quoting from the &lt;a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial"&gt;tutorial&lt;/a&gt;,&lt;/p&gt;
+ &lt;blockquote&gt;
+  &lt;p&gt;Repa is a Haskell library for high performance, regular, multi-dimensional parallel arrays. All numeric data is stored unboxed and functions written with the Repa combinators are automatically parallel...&lt;/p&gt;&lt;/blockquote&gt;
+ &lt;p&gt;Let&amp;rsquo;s describe what makes &lt;code&gt;repa&lt;/code&gt; fast step by step. Note that &lt;code&gt;repa&lt;/code&gt; heavily relies on the optimizations performed by the &lt;a href="http://www.haskell.org/ghc/"&gt;GHC&lt;/a&gt;, so whenever I say Haskell in this post, please think of the &lt;code&gt;GHC&lt;/code&gt; stack.&lt;/p&gt;
+ &lt;h3 id="Unboxed types"&gt;Unboxed types&lt;/h3&gt;
+ &lt;p&gt;Like in many other high-level languages, the default types in GHC are &lt;em&gt;boxed&lt;/em&gt;, meaning that they are represented by a pointer to a object in the heap, rather than a primitive type itself. The use of boxed types adds one level of indirection and thus has an impact on performance because of the extra allocation and the loss of locality.&lt;/p&gt;
+ &lt;p&gt;You can read more about unboxed types &lt;a href="http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html"&gt;in the manual&lt;/a&gt;.&lt;/p&gt;
+ &lt;h3 id="Stream fusion"&gt;Stream fusion&lt;/h3&gt;
+ &lt;p&gt;Consider a function like this:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;squareAddTwo :: [Int] -&amp;gt; Int
+squareAddTwo = sum . map (+2) . map (*3) &lt;/pre&gt;
+ &lt;p&gt; It is supposed to multiply each element in an integer list by three, add two, and then sum up all the numbers in the list. A naive implementation of the above would use 3 lists: the input list and two intermediate lists for storing the result of the two &lt;code&gt;map&lt;/code&gt; operations. These intermediate lists are costly in useless temporary allocation and garbage collection.&lt;/p&gt;
+ &lt;p&gt;Now, with stream fusion, equational laws are applied to get rid of these intermediate structures in a process called deforestation. The above could be translated into something like:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;myFoldingSquareAddTwo = foldl' (\x y -&amp;gt; x + (y*3 + 2)) 0&lt;/pre&gt;
+ &lt;p&gt; Note that recent versions of GHC have deforestation built-in for regular lists, so you can take advantage of fusion provided you stick to the old suspects: &lt;code&gt;map&lt;/code&gt;, &lt;code&gt;fold&lt;/code&gt;, etc... If you implement your own recursive functions, then GHC will &lt;em&gt;not&lt;/em&gt; be able to fuse. Here is a snippet that you can play with. I encourage you to try what is the largest value of &lt;code&gt;n&lt;/code&gt; for which this program correctly terminates:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;module Main where
+import System.Environment
+import Data.List (foldl')
+    
+myMap f [] = []
+myMap f (h:t) = f h : myMap f t
+
+mySum [] = 0
+mySum (h:t) = h + mySum t
+
+mySquareAddTwo = mySum . myMap  (+2) . myMap (*2) 
+
+squareAddTwo :: [Int] -&amp;gt; Int
+squareAddTwo = sum . map (+2) . map (*3) 
+
+myFoldingSquareAddTwo :: [Int] -&amp;gt; Int
+myFoldingSquareAddTwo = foldl' (\x y -&amp;gt; x + (y*3 + 2)) 0
+
+main = do
+  [n] &amp;lt;- getArgs
+  print $ squareAddTwo [1..read n :: Int]
+  print $ myFoldingSquareAddTwo [1..read n :: Int]        
+  print $ mySquareAddTwo [1..read n :: Int]  &lt;/pre&gt;
+ &lt;h3 id="Automatic parallelism"&gt;Automatic parallelism&lt;/h3&gt;
+ &lt;p&gt;Repa provides a set of combinators for creating and manipulating arrays. The operations needed to build an array are described declaratively in a first step (creating a so-called &lt;em&gt;delayed&lt;/em&gt; array), and then the array is later materialized (which will give an &lt;em&gt;unboxed&lt;/em&gt; array).&lt;/p&gt;
+ &lt;p&gt;This double process allows for &lt;code&gt;repa&lt;/code&gt; not only to fuse away the intermediate structures, but also to perform the required data dependency analysis prior to parallelizing the computation. &lt;/p&gt;
+ &lt;p&gt;Hopefully, the Voronoi example will help you understand this process.&lt;/p&gt;
+ &lt;h2 id="Voronoi"&gt;Voronoi&lt;/h2&gt;
+ &lt;p&gt;Quoting from the &lt;a href="http://en.wikipedia.org/wiki/Voronoi_diagram"&gt;wikipedia&lt;/a&gt;:&lt;/p&gt;
+ &lt;blockquote&gt;
+  &lt;p&gt;In mathematics, a Voronoi diagram is a way of dividing space into a number of regions. A set of points (called seeds, sites, or generators) is specified beforehand and for each seed there will be a corresponding region consisting of all points closer to that seed than to any other. The regions are called Voronoi cells&lt;/p&gt;&lt;/blockquote&gt;
+ &lt;p&gt;So we are trying to get a pretty picture like this one:&lt;/p&gt;
+ &lt;p&gt;-&amp;gt; &lt;img src="/img/voronoi.png" alt="Voronoi diagram" title="Voronoi diagram" /&gt; &amp;lt;-&lt;/p&gt;
+ &lt;h2 id="The Source"&gt;The Source&lt;/h2&gt;
+ &lt;pre class="brush: haskell"&gt;&lt;/pre&gt;
+ &lt;h2 id="References"&gt;References&lt;/h2&gt;
+ &lt;p&gt;asdf&lt;/p&gt;&lt;/html&gt;</description></item>
   <item>
    <title>Haskell Gotchas: Strings</title>
    <link>http://www.example.com/blog/2013/09/09/haskell-gotchas-strings/?utm_source=all&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2013-09-09-haskell-gotchas-strings</guid>
-   <pubDate>Mon, 09 Sep 2013 00:00:00 CEST</pubDate>
+   <pubDate>Mon, 09 Sep 2013 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2013%2F09%2F09%2Fhaskell-gotchas-strings%2F" height="1" width="1" /&gt;
  &lt;p&gt;I&amp;rsquo;ve been playing with &lt;a href="http://www.haskell.org"&gt;Haskell&lt;/a&gt; on and off for some time now. Let&amp;rsquo;s face it: it&amp;rsquo;s not an easy language to learn. I would agree with most people that part of the difficulty comes from its unique features (laziness, purity, etc...), and the abstractions that derive from them when facing real-world problems (Monads, Iteratees, etc...), but my point here is that there are other sources of confusion that keep misleading beginners like myself and that have nothing to do with all that.&lt;/p&gt;
@@ -56,7 +117,7 @@ myFuncExpectingDataText "Hello World!"&lt;/pre&gt;
    <title>Raw Strings in Factor </title>
    <link>http://www.example.com/blog/2013/02/24/raw-strings-in-factor/?utm_source=all&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2013-02-24-raw-strings-in-factor</guid>
-   <pubDate>Sun, 24 Feb 2013 00:00:00 CEST</pubDate>
+   <pubDate>Sun, 24 Feb 2013 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2013%2F02%2F24%2Fraw-strings-in-factor%2F" height="1" width="1" /&gt;
  &lt;p&gt;Ok, you may think I have a fixation with &lt;a href="blog/2011/08/07/raw-strings-in-racket/"&gt;raw strings&lt;/a&gt;, but if you&amp;rsquo;re like most developers and have used different languages through the years, you probably know the feeling of wanting to port your favourite features from language to language.&lt;/p&gt;
@@ -110,7 +171,7 @@ IN: scratchpad &lt;/pre&gt;
    <title>Raw Strings in Racket</title>
    <link>http://www.example.com/blog/2011/08/07/raw-strings-in-racket/?utm_source=all&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2011-08-07-raw-strings-in-racket</guid>
-   <pubDate>Sun, 07 Aug 2011 00:00:00 CEST</pubDate>
+   <pubDate>Sun, 07 Aug 2011 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F08%2F07%2Fraw-strings-in-racket%2F" height="1" width="1" /&gt;
  &lt;p&gt;One of the features I missed from the outstanding lisp dialect &lt;a href="http://www.racket-lang.org/"&gt;Racket&lt;/a&gt; (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language&amp;rsquo;s ability to extend its own syntax.  &lt;/p&gt;
@@ -252,7 +313,7 @@ IN: scratchpad &lt;/pre&gt;
    <title>Run Legacy Apps as Windows Services</title>
    <link>http://www.example.com/blog/2011/07/13/run-legacy-apps-as-windows-services/?utm_source=all&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2011-07-13-run-legacy-apps-as-windows-services</guid>
-   <pubDate>Wed, 13 Jul 2011 00:00:00 CEST</pubDate>
+   <pubDate>Wed, 13 Jul 2011 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F13%2Frun-legacy-apps-as-windows-services%2F" height="1" width="1" /&gt;
  &lt;p&gt;Although the right thing to do when programming a windows service is to use Microsoft&amp;rsquo;s API from the very beginning, it may also be desirable to run a regular executable as a service. &lt;/p&gt;
@@ -271,7 +332,7 @@ IN: scratchpad &lt;/pre&gt;
    <title>Blogging with Jekyll</title>
    <link>http://www.example.com/blog/2011/07/01/blogging-with-jekyll/?utm_source=all&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2011-07-01-blogging-with-jekyll</guid>
-   <pubDate>Fri, 01 Jul 2011 00:00:00 CEST</pubDate>
+   <pubDate>Fri, 01 Jul 2011 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F01%2Fblogging-with-jekyll%2F" height="1" width="1" /&gt;
  &lt;p&gt;... or, &amp;ldquo;from static to dynamic and back again&amp;rdquo;.&lt;/p&gt;

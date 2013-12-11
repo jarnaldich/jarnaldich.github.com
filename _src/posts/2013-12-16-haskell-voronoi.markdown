@@ -1,6 +1,6 @@
     Title: Parallel Voronoi in Haskell
     Date: 2013-12-16T00:00:00
-    Tags: haskell, voronoi, repa, parallel, DRAFT
+    Tags: haskell, voronoi, repa, parallel
 
 I recently bought a copy of *Parallel and Concurrent Programming in
 Haskell*, by Simon Marlow, also available online
@@ -35,8 +35,7 @@ Like in many other high-level languages, the default types in GHC are
 *boxed*, meaning that they are represented by a pointer to a object in
 the heap, rather than a primitive type itself. The use of boxed types
 adds one level of indirection and thus has an impact on performance
-because of the extra allocation and the loss of locality. `repa`, of
-course, uses unboxed types for efficiency.
+because of the extra allocation and the loss of locality.
 
 You can read more about unboxed types [in the manual](http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html).
 
@@ -53,9 +52,13 @@ It is supposed to multiply each element in an integer list by three,
 add two, and then sum up all the numbers in the list. A naive
 implementation of the above would use 3 lists: the input list and two
 intermediate lists for storing the result of the two `map` operations.
-Now, with stream fusion, equational laws are applied to get rid of
-these intermediate structures in a process called deforestation. The
-above could be translated into something like:
+These intermediate lists are costly in useless temporary allocation
+and garbage collection.
+
+Now, with stream fusion, equational laws are
+applied to get rid of these intermediate structures in a process
+called deforestation. The above could be translated into something
+like:
 
 ```haskell
 myFoldingSquareAddTwo = foldl' (\x y -> x + (y*3 + 2)) 0
@@ -118,9 +121,27 @@ Quoting from the [wikipedia](http://en.wikipedia.org/wiki/Voronoi_diagram):
 > corresponding region consisting of all points closer to that seed than
 > to any other. The regions are called Voronoi cells
 
-So we are trying to get a pretty picture like this:
+So we are trying to get a pretty picture like this one:
 
+![Voronoi diagram](/img/voronoi.png "Voronoi diagram")
 
+It is a 512x512 images with 150 random centers. The colored polygons
+represent the areas which are closer to a particular center. The most
+popular algorithm for computing a Voronoi diagram in 2 dimensions
+seems to be
+[Fortune's algorithm](http://en.wikipedia.org/wiki/Fortune's_algorithm).
+For real work, I'd recommend the excellent
+[qhull library](http://www.qhull.org/html/qvoronoi.htm).
+
+Since I was just interested in testing parallelism, I decided to
+implement it the
+[Rosetta Code](http://rosettacode.org/wiki/Voronoi_diagram) way, which
+is just applying the definition: take an image and a random set of
+points (the center). For each pixel, colour it according to the center
+that lies closest (in our case, closest according to the euclidean
+metric). This algorithm is embarassingly bad, but also
+[embarassingly parallel](http://en.wikipedia.org/wiki/Embarrassingly_parallel),
+since each pixel can be computed independently.
 
 ## The Source
 

@@ -1,3 +1,4 @@
+http://www.example.com/blog/2013/12/16/parallel-voronoi-in-haskell/
 http://www.example.com/blog/2013/09/09/haskell-gotchas-strings/
 http://www.example.com/blog/2013/02/24/raw-strings-in-factor/
 http://www.example.com/blog/2011/08/07/raw-strings-in-racket/

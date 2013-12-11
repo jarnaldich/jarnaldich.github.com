@@ -4,14 +4,14 @@
   <title>Joan Arnaldich's blog: Posts tagged 'gotchas'</title>
   <description>Joan Arnaldich's blog: Posts tagged 'gotchas'</description>
   <link>http://www.example.com/tags/gotchas.html</link>
-  <lastBuildDate>Mon, 09 Sep 2013 00:00:00 CEST</lastBuildDate>
-  <pubDate>Mon, 09 Sep 2013 00:00:00 CEST</pubDate>
+  <lastBuildDate>Mon, 09 Sep 2013 00:00:00 CET</lastBuildDate>
+  <pubDate>Mon, 09 Sep 2013 00:00:00 CET</pubDate>
   <ttl>1800</ttl>
   <item>
    <title>Haskell Gotchas: Strings</title>
    <link>http://www.example.com/blog/2013/09/09/haskell-gotchas-strings/?utm_source=gotchas&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2013-09-09-haskell-gotchas-strings</guid>
-   <pubDate>Mon, 09 Sep 2013 00:00:00 CEST</pubDate>
+   <pubDate>Mon, 09 Sep 2013 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=gotchas&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2013%2F09%2F09%2Fhaskell-gotchas-strings%2F" height="1" width="1" /&gt;
  &lt;p&gt;I&amp;rsquo;ve been playing with &lt;a href="http://www.haskell.org"&gt;Haskell&lt;/a&gt; on and off for some time now. Let&amp;rsquo;s face it: it&amp;rsquo;s not an easy language to learn. I would agree with most people that part of the difficulty comes from its unique features (laziness, purity, etc...), and the abstractions that derive from them when facing real-world problems (Monads, Iteratees, etc...), but my point here is that there are other sources of confusion that keep misleading beginners like myself and that have nothing to do with all that.&lt;/p&gt;

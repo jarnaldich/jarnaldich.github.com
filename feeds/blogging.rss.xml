@@ -4,14 +4,14 @@
   <title>Joan Arnaldich's blog: Posts tagged 'blogging'</title>
   <description>Joan Arnaldich's blog: Posts tagged 'blogging'</description>
   <link>http://www.example.com/tags/blogging.html</link>
-  <lastBuildDate>Fri, 01 Jul 2011 00:00:00 CEST</lastBuildDate>
-  <pubDate>Fri, 01 Jul 2011 00:00:00 CEST</pubDate>
+  <lastBuildDate>Fri, 01 Jul 2011 00:00:00 CET</lastBuildDate>
+  <pubDate>Fri, 01 Jul 2011 00:00:00 CET</pubDate>
   <ttl>1800</ttl>
   <item>
    <title>Blogging with Jekyll</title>
    <link>http://www.example.com/blog/2011/07/01/blogging-with-jekyll/?utm_source=blogging&amp;utm_medium=RSS</link>
    <guid>urn:http-www-example-com:-blog-2011-07-01-blogging-with-jekyll</guid>
-   <pubDate>Fri, 01 Jul 2011 00:00:00 CEST</pubDate>
+   <pubDate>Fri, 01 Jul 2011 00:00:00 CET</pubDate>
    <description>
 &lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=blogging&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2011%2F07%2F01%2Fblogging-with-jekyll%2F" height="1" width="1" /&gt;
  &lt;p&gt;... or, &amp;ldquo;from static to dynamic and back again&amp;rdquo;.&lt;/p&gt;
