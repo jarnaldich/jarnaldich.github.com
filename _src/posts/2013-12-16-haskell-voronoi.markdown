@@ -1,6 +1,6 @@
     Title: Parallel Voronoi in Haskell
     Date: 2013-12-16T00:00:00
-    Tags: haskell, voronoi, repa, parallel
+    Tags: haskell, voronoi, repa, parallel, DRAFT
 
 I recently bought a copy of *Parallel and Concurrent Programming in
 Haskell*, by Simon Marlow, also available online
@@ -147,10 +147,8 @@ since each pixel can be computed independently.
 
 ```haskell
 
-
-
 ```
 
 ## References
 
-asdf
+
