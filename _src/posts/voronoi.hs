@@ -18,7 +18,7 @@ centers :: Int -> Int -> Array U DIM2 Word32
 centers nCenters nCells =
       fromListUnboxed (Z :. nCenters :. 2)
     $ take (2*nCenters)
-    $ randomRs (0, fromIntegral nCells) (mkStdGen 1)
+    $ randomRs (0, fromIntegral (nCells - 1)) (mkStdGen 1)
 
 applyReduce2 arr f = 
     traverse arr (\(i :. j) -> i) $ \lookup (Z:.i) ->
@@ -63,4 +63,3 @@ main = do
   let ctable = genColorTable nsites 
   voro <- computeP $ colorize ctable $ voronoi nsites 512
   writeImageToBMP "out.bmp" voro
-

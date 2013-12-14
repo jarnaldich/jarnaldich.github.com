@@ -1,6 +1,6 @@
     Title: Parallel Voronoi in Haskell
     Date: 2013-12-16T00:00:00
-    Tags: haskell, voronoi, repa, parallel, DRAFT
+    Tags: haskell, voronoi, repa, parallel
 
 I recently bought a copy of *Parallel and Concurrent Programming in
 Haskell*, by Simon Marlow, also available online
@@ -52,8 +52,8 @@ It is supposed to multiply each element in an integer list by three,
 add two, and then sum up all the numbers in the list. A naive
 implementation of the above would use 3 lists: the input list and two
 intermediate lists for storing the result of the two `map` operations.
-These intermediate lists are costly in useless temporary allocation
-and garbage collection.
+These intermediate lists waste time and space doing useless temporary
+allocation and garbage collection.
 
 Now, with stream fusion, equational laws are
 applied to get rid of these intermediate structures in a process
@@ -126,11 +126,12 @@ So we are trying to get a pretty picture like this one:
 ![Voronoi diagram](/img/voronoi.png "Voronoi diagram")
 
 It is a 512x512 images with 150 random centers. The colored polygons
-represent the areas which are closer to a particular center. The most
+represent the areas which are closest to a particular center. The most
 popular algorithm for computing a Voronoi diagram in 2 dimensions
 seems to be
 [Fortune's algorithm](http://en.wikipedia.org/wiki/Fortune's_algorithm).
-For real work, though, I'd recommend the excellent
+There are also nice open-source implementations out there: for real
+work, I'd recommend the excellent
 [qhull library](http://www.qhull.org/html/qvoronoi.htm).
 
 Since I was just interested in testing parallelism, I decided to
@@ -146,14 +147,14 @@ since each pixel can be computed independently.
 
 ## The Source
 
-The code is pretty straight forward. You can find the whole source
+The code is pretty straightforward. You can find the whole source
 [here](https://raw.github.com/jarnaldich/jarnaldich.github.com/master/_src/posts/voronoi.hs),
 or on the [Rosetta Code](http://rosettacode.org/wiki/Voronoi_diagram)
 page.
 
 I'll comment on the most important parts.
 
-First, we need a function with the metric to maximize. To make it
+First, we need a function for the metric to minimize. To make it
 faster, we will not take the square root. We will also use strict
 annotations and 32 bit unsigned integers (`Word32`), instead of
 Haskell's unbounded `Int`s. Finally, we will tell GHC to inline it,
@@ -174,7 +175,7 @@ centers :: Int -> Int -> Array U DIM2 Word32
 centers nCenters nCells =
       fromListUnboxed (Z :. nCenters :. 2)
     $ take (2*nCenters)
-    $ randomRs (0, fromIntegral nCells) (mkStdGen 1)
+    $ randomRs (0, fromIntegral (nCells - 1)) (mkStdGen 1)
 ```
 
 Note the type signature: `Array U DIM2 Word32` means unboxed array
@@ -208,10 +209,12 @@ if this is not clear enough.
 Apart from `traverse`, there are more familiar combinators, like
 `foldS`, which is just like a fold for arrays. We make use of it to
 compute the minimum of a function over an array. The final `S` stands
-for "sequential". Some repa combinators come in two flavors sequential
-ones or parallel ones (would be `foldP`). For this algorithm we will
-parallelize only the pixel loop. Here's the minimization function,
-which basically decorates the array with an index before folding over it:
+for "sequential". Some repa combinators come in two flavors:
+sequential ones or parallel ones (would be `foldP`). For this
+algorithm we will parallelize only the pixel loop, so we are using the
+sequential version for the minimization loop. Here's the minimization
+function, which basically decorates the array with an index before
+folding over it:
 
 ```haskell
 minimize1D arr = foldS f h t
@@ -275,9 +278,9 @@ main = do
 ```
 
 There are some cool things going on under the hood. First, note that
-we just plugged the `colorize` and `voronoi` parts. Despite this,
-there will be no intermediate arrays: both calculations will be
-fused into a single operation.
+we just plugged the `colorize` and `voronoi` parts. In spite of this,
+there will be no intermediate arrays: both calculations will be fused
+into a single operation.
 
 The second thing is the use of a parallel combinator `computeP`, which
 will transform a delayed array into an unboxed one *in parallel*
