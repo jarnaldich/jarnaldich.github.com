@@ -4,3 +4,4 @@ _site
 *.o
 .DS_Store
 /_src/posts/out.bmp
+/_src/posts/voronoi
