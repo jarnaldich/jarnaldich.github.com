@@ -1,3 +1,6 @@
 _site
 \#*\#
+*.hi
+*.o
 .DS_Store
+/_src/posts/out.bmp
