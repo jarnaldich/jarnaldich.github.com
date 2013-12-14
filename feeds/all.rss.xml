@@ -4,9 +4,189 @@
   <title>Joan Arnaldich's blog: All Posts</title>
   <description>Joan Arnaldich's blog: All Posts</description>
   <link>http://www.example.com/index.html</link>
-  <lastBuildDate>Mon, 09 Sep 2013 00:00:00 CET</lastBuildDate>
-  <pubDate>Mon, 09 Sep 2013 00:00:00 CET</pubDate>
+  <lastBuildDate>Sat, 14 Dec 2013 00:00:00 CET</lastBuildDate>
+  <pubDate>Sat, 14 Dec 2013 00:00:00 CET</pubDate>
   <ttl>1800</ttl>
+  <item>
+   <title>Parallel Voronoi in Haskell</title>
+   <link>http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/?utm_source=all&amp;utm_medium=RSS</link>
+   <guid>urn:http-www-example-com:-blog-2013-12-14-parallel-voronoi-in-haskell</guid>
+   <pubDate>Sat, 14 Dec 2013 00:00:00 CET</pubDate>
+   <description>
+&lt;html&gt;&lt;img src="http://www.example.com/img/1x1.gif?utm_source=all&amp;amp;utm_medium=RSS&amp;amp;utm_campaign=%2Fblog%2F2013%2F12%2F14%2Fparallel-voronoi-in-haskell%2F" height="1" width="1" /&gt;
+ &lt;p&gt;I recently bought a copy of &lt;em&gt;Parallel and Concurrent Programming in Haskell&lt;/em&gt;, by Simon Marlow, also available online &lt;a href="http://chimera.labs.oreilly.com/books/1230000000929"&gt;here&lt;/a&gt;. It&amp;rsquo;s a very good overview for anyone who (like me) has ever been confused by the wealth of different libraries and primitives for doing concurrency &amp;amp; parallelism in Haskell.&lt;/p&gt;
+ &lt;h2 id="Repa"&gt;Repa&lt;/h2&gt;
+ &lt;p&gt;A library I found particularly compelling was &lt;a href="http://hackage.haskell.org/package/repa"&gt;repa&lt;/a&gt;. Quoting from the &lt;a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial"&gt;tutorial&lt;/a&gt;,&lt;/p&gt;
+ &lt;blockquote&gt;
+  &lt;p&gt;Repa is a Haskell library for high performance, regular, multi-dimensional parallel arrays. All numeric data is stored unboxed and functions written with the Repa combinators are automatically parallel...&lt;/p&gt;&lt;/blockquote&gt;
+ &lt;p&gt;Let&amp;rsquo;s describe what makes &lt;code&gt;repa&lt;/code&gt; fast step by step. Note that &lt;code&gt;repa&lt;/code&gt; heavily relies on the optimizations performed by the &lt;a href="http://www.haskell.org/ghc/"&gt;GHC&lt;/a&gt;, so whenever I say Haskell in this post, please think of the &lt;code&gt;GHC&lt;/code&gt; stack.&lt;/p&gt;
+ &lt;h3 id="Unboxed types"&gt;Unboxed types&lt;/h3&gt;
+ &lt;p&gt;Like in many other high-level languages, the default types in GHC are &lt;em&gt;boxed&lt;/em&gt;, meaning that they are represented by a pointer to a object in the heap, rather than a primitive type itself. The use of boxed types adds one level of indirection and thus has an impact on performance because of the extra allocation and the loss of locality.&lt;/p&gt;
+ &lt;p&gt;You can read more about unboxed types &lt;a href="http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html"&gt;in the manual&lt;/a&gt;.&lt;/p&gt;
+ &lt;h3 id="Stream fusion"&gt;Stream fusion&lt;/h3&gt;
+ &lt;p&gt;Consider a function like this:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;squareAddTwo :: [Int] -&amp;gt; Int
+squareAddTwo = sum . map (+2) . map (*3) &lt;/pre&gt;
+ &lt;p&gt; It is supposed to multiply each element in an integer list by three, add two, and then sum up all the numbers in the list. A naive implementation of the above would use 3 lists: the input list and two intermediate lists for storing the result of the two &lt;code&gt;map&lt;/code&gt; operations. These intermediate lists waste time and space doing useless temporary allocation and garbage collection.&lt;/p&gt;
+ &lt;p&gt;Now, with stream fusion, equational laws are applied to get rid of these intermediate structures in a process called deforestation. The above could be translated into something like:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;myFoldingSquareAddTwo = foldl' (\x y -&amp;gt; x + (y*3 + 2)) 0&lt;/pre&gt;
+ &lt;p&gt; Note that recent versions of GHC have deforestation built-in for regular lists, so you can take advantage of fusion provided you stick to the old suspects: &lt;code&gt;map&lt;/code&gt;, &lt;code&gt;fold&lt;/code&gt;, etc... If you implement your own recursive functions, then GHC will &lt;em&gt;not&lt;/em&gt; be able to fuse. Here is a snippet that you can play with. I encourage you to try what is the largest value of &lt;code&gt;n&lt;/code&gt; for which this program correctly terminates:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;module Main where
+import System.Environment
+import Data.List (foldl')
+    
+myMap f [] = []
+myMap f (h:t) = f h : myMap f t
+
+mySum [] = 0
+mySum (h:t) = h + mySum t
+
+mySquareAddTwo = mySum . myMap  (+2) . myMap (*2) 
+
+squareAddTwo :: [Int] -&amp;gt; Int
+squareAddTwo = sum . map (+2) . map (*3) 
+
+myFoldingSquareAddTwo :: [Int] -&amp;gt; Int
+myFoldingSquareAddTwo = foldl' (\x y -&amp;gt; x + (y*3 + 2)) 0
+
+main = do
+  [n] &amp;lt;- getArgs
+  print $ squareAddTwo [1..read n :: Int]
+  print $ myFoldingSquareAddTwo [1..read n :: Int]        
+  print $ mySquareAddTwo [1..read n :: Int]  &lt;/pre&gt;
+ &lt;h3 id="Automatic parallelism"&gt;Automatic parallelism&lt;/h3&gt;
+ &lt;p&gt;Repa provides a set of combinators for creating and manipulating arrays. The operations needed to build an array are described declaratively in a first step (creating a so-called &lt;em&gt;delayed&lt;/em&gt; array), and then the array is later materialized (which will give an &lt;em&gt;unboxed&lt;/em&gt; array).&lt;/p&gt;
+ &lt;p&gt;This double process allows for &lt;code&gt;repa&lt;/code&gt; not only to fuse away the intermediate structures, but also to perform the required data dependency analysis prior to parallelizing the computation. &lt;/p&gt;
+ &lt;p&gt;Hopefully, the Voronoi example will help you understand this process.&lt;/p&gt;
+ &lt;h2 id="Voronoi"&gt;Voronoi&lt;/h2&gt;
+ &lt;p&gt;Quoting from the &lt;a href="http://en.wikipedia.org/wiki/Voronoi_diagram"&gt;wikipedia&lt;/a&gt;:&lt;/p&gt;
+ &lt;blockquote&gt;
+  &lt;p&gt;In mathematics, a Voronoi diagram is a way of dividing space into a number of regions. A set of points (called seeds, sites, or generators) is specified beforehand and for each seed there will be a corresponding region consisting of all points closer to that seed than to any other. The regions are called Voronoi cells&lt;/p&gt;&lt;/blockquote&gt;
+ &lt;p&gt;So we are trying to get a pretty picture like this one:&lt;/p&gt;
+ &lt;p&gt;&lt;img src="/img/voronoi.png" alt="Voronoi diagram" title="Voronoi diagram" /&gt;&lt;/p&gt;
+ &lt;p&gt;It is a 512x512 images with 150 random centers. The colored polygons represent the areas which are closest to a particular center. The most popular algorithm for computing a Voronoi diagram in 2 dimensions seems to be &lt;a href="http://en.wikipedia.org/wiki/Fortune's_algorithm"&gt;Fortune&amp;rsquo;s algorithm&lt;/a&gt;. There are also nice open-source implementations out there: for real work, I&amp;rsquo;d recommend the excellent &lt;a href="http://www.qhull.org/html/qvoronoi.htm"&gt;qhull library&lt;/a&gt;.&lt;/p&gt;
+ &lt;p&gt;Since I was just interested in testing parallelism, I decided to implement it the &lt;a href="http://rosettacode.org/wiki/Voronoi_diagram"&gt;Rosetta Code&lt;/a&gt; way, which boils down to just applying the definition: take an image and a random set of in-range pixel coordinates (the centers). For each pixel, color it according to the center that lies closest (in our case, closest according to the euclidean metric). This algorithm is embarassingly naive, but also &lt;a href="http://en.wikipedia.org/wiki/Embarrassingly_parallel"&gt;embarassingly parallel&lt;/a&gt;, since each pixel can be computed independently.&lt;/p&gt;
+ &lt;h2 id="The Source"&gt;The Source&lt;/h2&gt;
+ &lt;p&gt;The code is pretty straightforward. You can find the whole source &lt;a href="https://raw.github.com/jarnaldich/jarnaldich.github.com/master/_src/posts/voronoi.hs"&gt;here&lt;/a&gt;, or on the &lt;a href="http://rosettacode.org/wiki/Voronoi_diagram"&gt;Rosetta Code&lt;/a&gt; page.&lt;/p&gt;
+ &lt;p&gt;I&amp;rsquo;ll comment on the most important parts.&lt;/p&gt;
+ &lt;p&gt;First, we need a function for the metric to minimize. To make it faster, we will not take the square root. We will also use strict annotations and 32 bit unsigned integers (&lt;code&gt;Word32&lt;/code&gt;), instead of Haskell&amp;rsquo;s unbounded &lt;code&gt;Int&lt;/code&gt;s. Finally, we will tell GHC to inline it, since &lt;code&gt;Repa&lt;/code&gt; recommends making extensive use of inlining (as always, when in doubt, profile).&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;{-# INLINE sqDistance #-}    
+sqDistance :: Word32 -&amp;gt; Word32 -&amp;gt; Word32 -&amp;gt; Word32 -&amp;gt; Word32
+sqDistance !x1 !y1 !x2 !y2 = ((x1-x2)^2) + ((y1-y2)^2)&lt;/pre&gt;
+ &lt;p&gt; Getting a random array with the centers is easy and shows the way to generate unboxed arrays from a list in &lt;code&gt;repa&lt;/code&gt;:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;centers :: Int -&amp;gt; Int -&amp;gt; Array U DIM2 Word32
+centers nCenters nCells =
+      fromListUnboxed (Z :. nCenters :. 2)
+    $ take (2*nCenters)
+    $ randomRs (0, fromIntegral (nCells - 1)) (mkStdGen 1)&lt;/pre&gt;
+ &lt;p&gt; Note the type signature: &lt;code&gt;Array U DIM2 Word32&lt;/code&gt; means unboxed array (the &lt;code&gt;U&lt;/code&gt;), indexed by 2 integers (the &lt;code&gt;DIM2&lt;/code&gt;) and storing &lt;code&gt;Word32&lt;/code&gt; values. The indexing is a bit tricky, since is mostly done with the &lt;code&gt;:.&lt;/code&gt; operator, and the notation is somewhat overloaded to denote indexes and shapes, so &lt;code&gt;arr Repa.! (Z:. i :. j)&lt;/code&gt; means the element in the ith row and jth column of the array arr, but &lt;code&gt;fromListUnboxed (Z :. nCenters :. 2)&lt;/code&gt; means we are creating an array of &lt;code&gt;nCenters&lt;/code&gt; rows and 2 columns.&lt;/p&gt;
+ &lt;p&gt;Now there come two helper functions. The first one takes a 2 column matrix and a two parameter function and returns the array resulting of applying the function to each row. &lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;applyReduce2 arr f = 
+    traverse arr (\(i :. j) -&amp;gt; i) $ \lookup (Z:.i) -&amp;gt;
+        f (lookup (Z:.i:.0)) (lookup (Z:.i:.1))&lt;/pre&gt;
+ &lt;p&gt; In order to do so, this function makes use of a very powerful &lt;code&gt;repa&lt;/code&gt; combinator, which takes a function on the indices (in this case, reduces one dimension) and a two parameter function. The first parameter is itself a lookup function on the input array, while the second one is the index of the output array whose value we are trying to compute. Please refer to the &lt;a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial"&gt;tutorial&lt;/a&gt; if this is not clear enough.&lt;/p&gt;
+ &lt;p&gt;Apart from &lt;code&gt;traverse&lt;/code&gt;, there are more familiar combinators, like &lt;code&gt;foldS&lt;/code&gt;, which is just like a fold for arrays. We make use of it to compute the minimum of a function over an array. The final &lt;code&gt;S&lt;/code&gt; stands for &amp;ldquo;sequential&amp;rdquo;. Some repa combinators come in two flavors: sequential ones or parallel ones (would be &lt;code&gt;foldP&lt;/code&gt;). For this algorithm we will parallelize only the pixel loop, so we are using the sequential version for the minimization loop. Here&amp;rsquo;s the minimization function, which basically decorates the array with an index before folding over it:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;minimize1D arr = foldS f h t
+  where
+    indexer src idx@(Z :. i) = (src idx, (fromIntegral i))
+    indexed arr = traverse arr id indexer
+    (Z :. n) = extent arr
+    iarr = indexed arr
+    h = iarr ! (Z :. 0)
+    t = extract (Z :. 1) (Z :. (n-1)) iarr
+    f min@(!valMin, !iMin ) x@(!val, !i) | val &amp;lt; valMin = x
+                                         | otherwise = min&lt;/pre&gt;
+ &lt;p&gt; With these helpers, writing a parallel voronoi is easy. We will make use of &lt;code&gt;fromFunction&lt;/code&gt; to create a &lt;em&gt;delayed&lt;/em&gt; array, which we can later force to compute.&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;voronoi :: Int -&amp;gt; Int -&amp;gt; Array D DIM2 Word32
+voronoi nCenters nCells =
+    let
+      cellReducer = applyReduce2 (centers nCenters nCells)
+      nearestCenterIndex = snd . (Repa.! Z) . minimize1D
+      {-# INLINE builder #-}
+      builder (Z:.i:.j) = nearestCenterIndex
+                        $ cellReducer $ on sqDistance fromIntegral i j
+    in        
+      Repa.fromFunction (Z :. nCells :. nCells :: DIM2) builder&lt;/pre&gt;
+ &lt;p&gt; The &lt;code&gt;voronoi&lt;/code&gt; function creates a matrix of integer indices, referring to the center which is closest. If we want to write that as an RGB image, we will also need a function to create a random color table and another one to colorize the voronoi array:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;genColorTable :: Int -&amp;gt; Array U DIM1 (Word8, Word8, Word8)
+genColorTable n = fromListUnboxed (Z :. n) $ zip3 l1 l2 l3
+    where
+      randoms = randomRs (0,255) (mkStdGen 1)
+      (l1, rest1) = splitAt n randoms
+      (l2, rest2) = splitAt n rest1
+      l3 = take n rest2
+
+colorize ctable = Repa.map $ \x -&amp;gt; ctable Repa.! (Z:. fromIntegral x)&lt;/pre&gt;
+ &lt;p&gt; As we can see, the colorized table will be a two dimensional array of 3-element tuples: one for the red, green, and blue components. This is the format expected by &lt;code&gt;writeImageToBMP&lt;/code&gt; in the &lt;code&gt;Repa.IO.BMP&lt;/code&gt; package.&lt;/p&gt;
+ &lt;p&gt;with all the above, the main function will look like:&lt;/p&gt;
+ &lt;pre class="brush: haskell"&gt;main = do
+  let nsites = 150
+  let ctable = genColorTable nsites 
+  voro &amp;lt;- computeP $ colorize ctable $ voronoi nsites 512
+  writeImageToBMP "out.bmp" voro&lt;/pre&gt;
+ &lt;p&gt; There are some cool things going on under the hood. First, note that we just plugged the &lt;code&gt;colorize&lt;/code&gt; and &lt;code&gt;voronoi&lt;/code&gt; parts. In spite of this, there will be no intermediate arrays: both calculations will be fused into a single operation.&lt;/p&gt;
+ &lt;p&gt;The second thing is the use of a parallel combinator &lt;code&gt;computeP&lt;/code&gt;, which will transform a delayed array into an unboxed one &lt;em&gt;in parallel&lt;/em&gt; (given the appropiate compilation options and runtime parameters). Note that parallel computations in repa must run in some monad, to ensure they are performed in the appropiate order. It can be any monad (in this case, it&amp;rsquo;s &lt;code&gt;main&lt;/code&gt;'s &lt;code&gt;IO&lt;/code&gt;).&lt;/p&gt;
+ &lt;p&gt;Now, if we compile with&lt;/p&gt;
+ &lt;pre&gt;ghc -O2 -fllvm -fforce-recomp -threaded --make voronoi.hs  -o voronoi&lt;/pre&gt;
+ &lt;p&gt; My machine is a somewhat oldish 2GHz Intel Core 2 Duo with 4GB (1067Mhz DDR3) of RAM. We can try to run it on one core:&lt;/p&gt;
+ &lt;pre&gt;$ time ./voronoi
+
+real	0m3.015s
+user	0m2.946s
+sys	0m0.069s&lt;/pre&gt;
+ &lt;p&gt; or on two cores:&lt;/p&gt;
+ &lt;pre&gt;$time ./voronoi +RTS -N2
+
+real	0m1.644s
+user	0m3.101s
+sys	0m0.068s&lt;/pre&gt;
+ &lt;p&gt; Note that the speedup is pretty good. We can also see detailed statistics by the runtime system:&lt;/p&gt;
+ &lt;pre&gt;$ ./voronoi +RTS -N2 -s
+   8,750,790,680 bytes allocated in the heap
+       5,940,344 bytes copied during GC
+         852,168 bytes maximum residency (2 sample(s))
+          49,752 bytes maximum slop
+               5 MB total memory in use (2 MB lost due to fragmentation)
+
+                                  Tot time (elapsed)  Avg pause  Max pause
+Gen  0      8640 colls,  8639 par    0.15s    0.11s     0.0000s    0.0033s
+Gen  1         2 colls,     2 par    0.00s    0.00s     0.0003s    0.0005s
+
+  Parallel GC work balance: 1.78 (690765 / 388167, ideal 2)
+
+                        MUT time (elapsed)       GC time  (elapsed)
+  Task  0 (worker) :    3.00s    (  1.57s)       0.18s    (  0.13s)
+  Task  1 (worker) :    3.18s    (  1.69s)       0.00s    (  0.00s)
+  Task  2 (bound)  :    3.18s    (  1.69s)       0.00s    (  0.00s)
+  Task  3 (worker) :    2.97s    (  1.54s)       0.21s    (  0.15s)
+
+  SPARKS: 0 (0 converted, 0 overflowed, 0 dud, 0 GC'd, 0 fizzled)
+
+  INIT    time    0.00s  (  0.00s elapsed)
+  MUT     time    3.03s  (  1.59s elapsed)
+  GC      time    0.15s  (  0.11s elapsed)
+  EXIT    time    0.00s  (  0.00s elapsed)
+  Total   time    3.18s  (  1.69s elapsed)
+
+  Alloc rate    2,884,832,617 bytes per MUT second
+
+  Productivity  95.3% of total user, 179.1% of total elapsed
+
+gc_alloc_block_sync: 3416
+whitehole_spin: 0
+gen[0].sync: 0
+gen[1].sync: 3&lt;/pre&gt;
+ &lt;p&gt; 95% user productivity looks good to me. By comparison, and unoptimized single-core &lt;code&gt;C&lt;/code&gt; version out of &lt;a href="http://rosettacode.org/wiki/Voronoi_diagram"&gt;Rosetta Code&lt;/a&gt; takes somewhat less than 2 seconds, while the optimized one takes around half a second.&lt;/p&gt;
+ &lt;p&gt;Please, take the times above with a grain of salt: I am sure a seasoned haskeller would squeeze more speed out of my version, and probably the &lt;code&gt;C&lt;/code&gt; and the Haskell should&amp;rsquo;nt be compared in the first place (the output image format is different).&lt;/p&gt;
+ &lt;h2 id="Conclusions"&gt;Conclusions&lt;/h2&gt;
+ &lt;p&gt;As we have seen, writing parallel array operations with a decent performance is easy with &lt;code&gt;Repa&lt;/code&gt;. While I am doubtful that it can reach the speed of &lt;code&gt;C&lt;/code&gt; without making the code just too ugly, IMHO the balance between speed, ease of development and compositional style makes &lt;code&gt;Repa&lt;/code&gt; a worthwhile tool in your bag.&lt;/p&gt;
+ &lt;h2 id="References"&gt;References&lt;/h2&gt;
+ &lt;p&gt;Here are some cool links if you want to play around with Voronoi diagrams:&lt;/p&gt;
+ &lt;ul&gt;
+  &lt;li&gt;&lt;a href="http://bl.ocks.org/mbostock/4060366"&gt;Online demo&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://www.raymondhill.net/voronoi/rhill-voronoi.html"&gt;Another one&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://www.senchalabs.org/philogl/PhiloGL/examples/voronoi/"&gt;A spherical one&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href="http://voronoi.com/wiki/index.php?title=Main_Page"&gt;The vorowiki&lt;/a&gt;&lt;/li&gt;&lt;/ul&gt;&lt;/html&gt;</description></item>
   <item>
    <title>Haskell Gotchas: Strings</title>
    <link>http://www.example.com/blog/2013/09/09/haskell-gotchas-strings/?utm_source=all&amp;utm_medium=RSS</link>

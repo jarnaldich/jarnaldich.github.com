@@ -1,5 +1,5 @@
     Title: Parallel Voronoi in Haskell
-    Date: 2013-12-16T00:00:00
+    Date: 2013-12-14T00:00:00
     Tags: haskell, voronoi, repa, parallel
 
 I recently bought a copy of *Parallel and Concurrent Programming in
@@ -247,7 +247,7 @@ voronoi nCenters nCells =
 ```
 
 The `voronoi` function creates a matrix of integer indices, referring
-to the center which is closer. If we want to write that as an RGB
+to the center which is closest. If we want to write that as an RGB
 image, we will also need a function to create a random color table and
 another one to colorize the voronoi array:
 
