@@ -17,7 +17,7 @@ main = hakyll $ do
         route idRoute
         compile copyFileCompiler
 
-    match "resources/**" $ do
+    match "images/**" $ do
         route idRoute
         compile copyFileCompiler
 
@@ -29,15 +29,15 @@ main = hakyll $ do
 
     --building posts and post-related pages
     --for some reason, moving it this late gets the links right while putting it first doesn't
-    tags <- buildTags "posts/*" $ fromCapture "tags/*.html"
+    tags <- buildTags "blog/*" $ fromCapture "tags/*.html"
 
-    match "posts/*" $ do
-        route $ setExtension "html"
+    match "blog/*" $ do
+        route $ (customRoute dateSubdirRoute) `composeRoutes` (setExtension "html")
         compile $ pandocCompiler'
             >>= loadAndApplyTemplate "templates/post.html" (taggedPostCtx tags)
             >>= saveSnapshot "content"
             >>= loadAndApplyTemplate "templates/default.html" postCtx
-            >>= relativizeUrls
+--            >>= relativizeUrls
 
     create ["posts.html"] $ do
         route idRoute
@@ -50,7 +50,7 @@ main = hakyll $ do
             makeItem ""
                 >>= loadAndApplyTemplate "templates/posts.html" archiveCtx
                 >>= loadAndApplyTemplate "templates/default.html" archiveCtx
-                >>= relativizeUrls
+--                >>= relativizeUrls
 
     --building tag pages and tag cloud
     tagsRules tags $ \tag pattern -> do
@@ -93,7 +93,7 @@ main = hakyll $ do
         compile $ do
             let feedCtx = postCtx `mappend` bodyField "description"
 
-            posts <- (take 10) <$> (recentFirst =<< loadAllSnapshots "posts/*" "content")
+            posts <- (take 10) <$> (recentFirst =<< loadAllSnapshots "blog/*" "content")
             renderRss feedConfig feedCtx posts
 
     --loading the templated
@@ -104,15 +104,15 @@ extensions = Set.fromList [Ext_inline_notes, Ext_tex_math_dollars]
 
 feedConfig :: FeedConfiguration
 feedConfig = FeedConfiguration {
-        feedTitle       = "AustinRochford.com",
-        feedDescription = "Math, Data, and Software",
-        feedAuthorName  = "Austin Rochford",
-        feedAuthorEmail = "austin.rochford@gmail.com",
-        feedRoot        = "http://www.austinrochford.com"
+        feedTitle       = "jarnaldich.me",
+        feedDescription = "Joan Arnaldich's Blog",
+        feedAuthorName  = "Joan Arnaldich",
+        feedAuthorEmail = "jarnaldich@gmail.com",
+        feedRoot        = "http://jarnaldich.me"
     }
 
 mostRecentPost :: Compiler (Item String)
-mostRecentPost = head <$> (recentFirst =<< loadAllSnapshots "posts/*" "content")
+mostRecentPost = head <$> (recentFirst =<< loadAllSnapshots "blog/*" "content")
 
 pandocCompiler' :: Compiler (Item String)
 pandocCompiler' = pandocCompilerWith pandocMathReaderOptions pandocMathWriterOptions
@@ -133,7 +133,7 @@ postCtx = dateField "date" "%B %e, %Y" `mappend` defaultContext
 
 postList :: ([Item String] -> Compiler [Item String]) -> Compiler String
 postList sortFilter = do
-    posts   <- sortFilter =<< loadAll "posts/*"
+    posts   <- sortFilter =<< loadAll "blog/*"
     itemTpl <- loadBody "templates/post-item.html"
     list    <- applyTemplateList itemTpl postCtx posts
     return list
@@ -146,3 +146,14 @@ postsTagged tags pattern sortFilter = do
 
 taggedPostCtx :: Tags -> Context String
 taggedPostCtx tags = tagsField "tags" tags `mappend` postCtx
+
+
+dateSubdirRoute :: Identifier -> FilePath
+dateSubdirRoute x =
+  let
+    (year,  '-' : aux1) = break (== '-') $ toFilePath x
+    (month, '-' : aux2)= break (== '-')  aux1
+    (day,   '-' : title) =  break (== '-') aux2
+  in
+   year ++ "/" ++ month ++ "/" ++ day  ++ "/" ++ title
+            

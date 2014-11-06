@@ -36,3 +36,17 @@ pre code {
 .social .twitter {
     width: 95px;
 }
+
+.fa {
+    color: #8AC007; /* #FF6600; */
+}
+
+a {
+    color: #8AC007;
+}
+
+sup  {
+    /* color: #8AC007; */
+    font-size: 0.5em;
+    vertical-align: super;
+}
