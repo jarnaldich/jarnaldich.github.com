@@ -1,0 +1,733 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>jarnaldich.me</title>
+        <link>http://jarnaldich.me</link>
+        <description><![CDATA[Joan Arnaldich's Blog]]></description>
+        <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
+                   type="application/rss+xml" />
+        <lastBuildDate>Sat, 14 Dec 2013 00:00:00 UT</lastBuildDate>
+        <item>
+    <title>Parallel Voronoi in Haskell</title>
+    <link>http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html</link>
+    <description><![CDATA[<h3>Parallel Voronoi in Haskell</h3>
+
+<small>Posted on December 14, 2013 <a href="/blog/2013/12/14/haskell-voronoi.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>I recently bought a copy of <em>Parallel and Concurrent Programming in Haskell</em>, by Simon Marlow, also available online <a href="http://chimera.labs.oreilly.com/books/1230000000929">here</a>. It’s a very good overview for anyone who (like me) has ever been confused by the wealth of different libraries and primitives for doing concurrency &amp; parallelism in Haskell.</p>
+<p>So I thought I would put what I learned to work with an example of my own. <!-- more --></p>
+<h2 id="repa">Repa</h2>
+<p>A library I found particularly compelling was <a href="http://hackage.haskell.org/package/repa">repa</a>. Quoting from the <a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial">tutorial</a>,</p>
+<blockquote>
+<p>Repa is a Haskell library for high performance, regular, multi-dimensional parallel arrays. All numeric data is stored unboxed and functions written with the Repa combinators are automatically parallel…</p>
+</blockquote>
+<p>Let’s describe what makes <code>repa</code> fast step by step. Note that <code>repa</code> heavily relies on the optimizations performed by the <a href="http://www.haskell.org/ghc/">GHC</a>, so whenever I say Haskell in this post, please think of the <code>GHC</code> stack.</p>
+<h3 id="unboxed-types">Unboxed types</h3>
+<p>Like in many other high-level languages, the default types in GHC are <em>boxed</em>, meaning that they are represented by a pointer to a object in the heap, rather than a primitive type itself. The use of boxed types adds one level of indirection and thus has an impact on performance because of the extra allocation and the loss of locality.</p>
+<p>You can read more about unboxed types <a href="http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html">in the manual</a>.</p>
+<h3 id="stream-fusion">Stream fusion</h3>
+<p>Consider a function like this:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
+squareAddTwo <span class="fu">=</span> sum <span class="fu">.</span> map (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> map (<span class="fu">*</span><span class="dv">3</span>) </code></pre>
+<p>It is supposed to multiply each element in an integer list by three, add two, and then sum up all the numbers in the list. A naive implementation of the above would use 3 lists: the input list and two intermediate lists for storing the result of the two <code>map</code> operations. These intermediate lists waste time and space doing useless temporary allocation and garbage collection.</p>
+<p>Now, with stream fusion, equational laws are applied to get rid of these intermediate structures in a process called deforestation. The above could be translated into something like:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">myFoldingSquareAddTwo <span class="fu">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="fu">+</span> (y<span class="fu">*</span><span class="dv">3</span> <span class="fu">+</span> <span class="dv">2</span>)) <span class="dv">0</span></code></pre>
+<p>Note that recent versions of GHC have deforestation built-in for regular lists, so you can take advantage of fusion provided you stick to the old suspects: <code>map</code>, <code>fold</code>, etc… If you implement your own recursive functions, then GHC will <em>not</em> be able to fuse. Here is a snippet that you can play with. I encourage you to try what is the largest value of <code>n</code> for which this program correctly terminates:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span>
+<span class="kw">import </span><span class="dt">System.Environment</span>
+<span class="kw">import </span><span class="dt">Data.List</span> (foldl&#39;)
+    
+myMap f [] <span class="fu">=</span> []
+myMap f (h<span class="fu">:</span>t) <span class="fu">=</span> f h <span class="fu">:</span> myMap f t
+
+mySum [] <span class="fu">=</span> <span class="dv">0</span>
+mySum (h<span class="fu">:</span>t) <span class="fu">=</span> h <span class="fu">+</span> mySum t
+
+mySquareAddTwo <span class="fu">=</span> mySum <span class="fu">.</span> myMap  (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> myMap (<span class="fu">*</span><span class="dv">2</span>) 
+
+<span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
+squareAddTwo <span class="fu">=</span> sum <span class="fu">.</span> map (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> map (<span class="fu">*</span><span class="dv">3</span>) 
+
+<span class="ot">myFoldingSquareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
+myFoldingSquareAddTwo <span class="fu">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="fu">+</span> (y<span class="fu">*</span><span class="dv">3</span> <span class="fu">+</span> <span class="dv">2</span>)) <span class="dv">0</span>
+
+main <span class="fu">=</span> <span class="kw">do</span>
+  [n] <span class="ot">&lt;-</span> getArgs
+  print <span class="fu">$</span> squareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]
+  print <span class="fu">$</span> myFoldingSquareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]        
+  print <span class="fu">$</span> mySquareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]  </code></pre>
+<h3 id="automatic-parallelism">Automatic parallelism</h3>
+<p>Repa provides a set of combinators for creating and manipulating arrays. The operations needed to build an array are described declaratively in a first step (creating a so-called <em>delayed</em> array), and then the array is later materialized (which will give an <em>unboxed</em> array).</p>
+<p>This double process allows for <code>repa</code> not only to fuse away the intermediate structures, but also to perform the required data dependency analysis prior to parallelizing the computation.</p>
+<p>Hopefully, the Voronoi example will help you understand this process.</p>
+<h2 id="voronoi">Voronoi</h2>
+<p>Quoting from the <a href="http://en.wikipedia.org/wiki/Voronoi_diagram">wikipedia</a>:</p>
+<blockquote>
+<p>In mathematics, a Voronoi diagram is a way of dividing space into a number of regions. A set of points (called seeds, sites, or generators) is specified beforehand and for each seed there will be a corresponding region consisting of all points closer to that seed than to any other. The regions are called Voronoi cells</p>
+</blockquote>
+<p>So we are trying to get a pretty picture like this one:</p>
+<div class="figure">
+<img src="/images/voronoi.png" title="Voronoi diagram" alt="Voronoi diagram" /><p class="caption">Voronoi diagram</p>
+</div>
+<p>It is a 512x512 images with 150 random centers. The colored polygons represent the areas which are closest to a particular center. The most popular algorithm for computing a Voronoi diagram in 2 dimensions seems to be <a href="http://en.wikipedia.org/wiki/Fortune&#39;s_algorithm">Fortune’s algorithm</a>. There are also nice open-source implementations out there: for real work, I’d recommend the excellent <a href="http://www.qhull.org/html/qvoronoi.htm">qhull library</a>.</p>
+<p>Since I was just interested in testing parallelism, I decided to implement it the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> way, which boils down to just applying the definition: take an image and a random set of in-range pixel coordinates (the centers). For each pixel, color it according to the center that lies closest (in our case, closest according to the euclidean metric). This algorithm is embarassingly naive, but also <a href="http://en.wikipedia.org/wiki/Embarrassingly_parallel">embarassingly parallel</a>, since each pixel can be computed independently.</p>
+<h2 id="the-source">The Source</h2>
+<p>The code is pretty straightforward. You can find the whole source <a href="https://raw.github.com/jarnaldich/jarnaldich.github.com/master/_src/posts/voronoi.hs">here</a>, or on the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> page.</p>
+<p>I’ll comment on the most important parts.</p>
+<p>First, we need a function for the metric to minimize. To make it faster, we will not take the square root. We will also use strict annotations and 32 bit unsigned integers (<code>Word32</code>), instead of Haskell’s unbounded <code>Int</code>s. Finally, we will tell GHC to inline it, since <code>Repa</code> recommends making extensive use of inlining (as always, when in doubt, profile).</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">{-# INLINE sqDistance #-}</span>    
+<span class="ot">sqDistance ::</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span>
+sqDistance <span class="fu">!</span>x1 <span class="fu">!</span>y1 <span class="fu">!</span>x2 <span class="fu">!</span>y2 <span class="fu">=</span> ((x1<span class="fu">-</span>x2)<span class="fu">^</span><span class="dv">2</span>) <span class="fu">+</span> ((y1<span class="fu">-</span>y2)<span class="fu">^</span><span class="dv">2</span>)</code></pre>
+<p>Getting a random array with the centers is easy and shows the way to generate unboxed arrays from a list in <code>repa</code>:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">centers ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM2</span> <span class="dt">Word32</span>
+centers nCenters nCells <span class="fu">=</span>
+      fromListUnboxed (<span class="dt">Z</span> <span class="fu">:.</span> nCenters <span class="fu">:.</span> <span class="dv">2</span>)
+    <span class="fu">$</span> take (<span class="dv">2</span><span class="fu">*</span>nCenters)
+    <span class="fu">$</span> randomRs (<span class="dv">0</span>, fromIntegral (nCells <span class="fu">-</span> <span class="dv">1</span>)) (mkStdGen <span class="dv">1</span>)</code></pre>
+<p>Note the type signature: <code>Array U DIM2 Word32</code> means unboxed array (the <code>U</code>), indexed by 2 integers (the <code>DIM2</code>) and storing <code>Word32</code> values. The indexing is a bit tricky, since is mostly done with the <code>:.</code> operator, and the notation is somewhat overloaded to denote indexes and shapes, so <code>arr Repa.! (Z:. i :. j)</code> means the element in the ith row and jth column of the array arr, but <code>fromListUnboxed (Z :. nCenters :. 2)</code> means we are creating an array of <code>nCenters</code> rows and 2 columns.</p>
+<p>Now there come two helper functions. The first one takes a 2 column matrix and a two parameter function and returns the array resulting of applying the function to each row.</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">applyReduce2 arr f <span class="fu">=</span> 
+    traverse arr (\(i <span class="fu">:.</span> j) <span class="ot">-&gt;</span> i) <span class="fu">$</span> \lookup (<span class="dt">Z</span><span class="fu">:.</span>i) <span class="ot">-&gt;</span>
+        f (lookup (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span><span class="dv">0</span>)) (lookup (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span><span class="dv">1</span>))</code></pre>
+<p>In order to do so, this function makes use of a very powerful <code>repa</code> combinator, which takes a function on the indices (in this case, reduces one dimension) and a two parameter function. The first parameter is itself a lookup function on the input array, while the second one is the index of the output array whose value we are trying to compute. Please refer to the <a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial">tutorial</a> if this is not clear enough.</p>
+<p>Apart from <code>traverse</code>, there are more familiar combinators, like <code>foldS</code>, which is just like a fold for arrays. We make use of it to compute the minimum of a function over an array. The final <code>S</code> stands for “sequential”. Some repa combinators come in two flavors: sequential ones or parallel ones (would be <code>foldP</code>). For this algorithm we will parallelize only the pixel loop, so we are using the sequential version for the minimization loop. Here’s the minimization function, which basically decorates the array with an index before folding over it:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">minimize1D arr <span class="fu">=</span> foldS f h t
+  <span class="kw">where</span>
+    indexer src idx<span class="fu">@</span>(<span class="dt">Z</span> <span class="fu">:.</span> i) <span class="fu">=</span> (src idx, (fromIntegral i))
+    indexed arr <span class="fu">=</span> traverse arr id indexer
+    (<span class="dt">Z</span> <span class="fu">:.</span> n) <span class="fu">=</span> extent arr
+    iarr <span class="fu">=</span> indexed arr
+    h <span class="fu">=</span> iarr <span class="fu">!</span> (<span class="dt">Z</span> <span class="fu">:.</span> <span class="dv">0</span>)
+    t <span class="fu">=</span> extract (<span class="dt">Z</span> <span class="fu">:.</span> <span class="dv">1</span>) (<span class="dt">Z</span> <span class="fu">:.</span> (n<span class="fu">-</span><span class="dv">1</span>)) iarr
+    f min<span class="fu">@</span>(<span class="fu">!</span>valMin, <span class="fu">!</span>iMin ) x<span class="fu">@</span>(<span class="fu">!</span>val, <span class="fu">!</span>i) <span class="fu">|</span> val <span class="fu">&lt;</span> valMin <span class="fu">=</span> x
+                                         <span class="fu">|</span> otherwise <span class="fu">=</span> min</code></pre>
+<p>With these helpers, writing a parallel voronoi is easy. We will make use of <code>fromFunction</code> to create a <em>delayed</em> array, which we can later force to compute.</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">voronoi ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">D</span> <span class="dt">DIM2</span> <span class="dt">Word32</span>
+voronoi nCenters nCells <span class="fu">=</span>
+    <span class="kw">let</span>
+      cellReducer <span class="fu">=</span> applyReduce2 (centers nCenters nCells)
+      nearestCenterIndex <span class="fu">=</span> snd <span class="fu">.</span> (<span class="fu">Repa.!</span> <span class="dt">Z</span>) <span class="fu">.</span> minimize1D
+      <span class="ot">{-# INLINE builder #-}</span>
+      builder (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span>j) <span class="fu">=</span> nearestCenterIndex
+                        <span class="fu">$</span> cellReducer <span class="fu">$</span> on sqDistance fromIntegral i j
+    <span class="kw">in</span>        
+      Repa.fromFunction (<span class="dt">Z</span> <span class="fu">:.</span> nCells <span class="fu">:.</span><span class="ot"> nCells ::</span> <span class="dt">DIM2</span>) builder</code></pre>
+<p>The <code>voronoi</code> function creates a matrix of integer indices, referring to the center which is closest. If we want to write that as an RGB image, we will also need a function to create a random color table and another one to colorize the voronoi array:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">genColorTable ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM1</span> (<span class="dt">Word8</span>, <span class="dt">Word8</span>, <span class="dt">Word8</span>)
+genColorTable n <span class="fu">=</span> fromListUnboxed (<span class="dt">Z</span> <span class="fu">:.</span> n) <span class="fu">$</span> zip3 l1 l2 l3
+    <span class="kw">where</span>
+      randoms <span class="fu">=</span> randomRs (<span class="dv">0</span>,<span class="dv">255</span>) (mkStdGen <span class="dv">1</span>)
+      (l1, rest1) <span class="fu">=</span> splitAt n randoms
+      (l2, rest2) <span class="fu">=</span> splitAt n rest1
+      l3 <span class="fu">=</span> take n rest2
+
+colorize ctable <span class="fu">=</span> Repa.map <span class="fu">$</span> \x <span class="ot">-&gt;</span> ctable <span class="fu">Repa.!</span> (<span class="dt">Z</span><span class="fu">:.</span> fromIntegral x)</code></pre>
+<p>As we can see, the colorized table will be a two dimensional array of 3-element tuples: one for the red, green, and blue components. This is the format expected by <code>writeImageToBMP</code> in the <code>Repa.IO.BMP</code> package.</p>
+<p>with all the above, the main function will look like:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">main <span class="fu">=</span> <span class="kw">do</span>
+  <span class="kw">let</span> nsites <span class="fu">=</span> <span class="dv">150</span>
+  <span class="kw">let</span> ctable <span class="fu">=</span> genColorTable nsites 
+  voro <span class="ot">&lt;-</span> computeP <span class="fu">$</span> colorize ctable <span class="fu">$</span> voronoi nsites <span class="dv">512</span>
+  writeImageToBMP <span class="st">&quot;out.bmp&quot;</span> voro</code></pre>
+<p>There are some cool things going on under the hood. First, note that we just plugged the <code>colorize</code> and <code>voronoi</code> parts. In spite of this, there will be no intermediate arrays: both calculations will be fused into a single operation.</p>
+<p>The second thing is the use of a parallel combinator <code>computeP</code>, which will transform a delayed array into an unboxed one <em>in parallel</em> (given the appropiate compilation options and runtime parameters). Note that parallel computations in repa must run in some monad, to ensure they are performed in the appropiate order. It can be any monad (in this case, it’s <code>main</code>’s <code>IO</code>).</p>
+<p>Now, if we compile with</p>
+<pre><code>ghc -O2 -fllvm -fforce-recomp -threaded --make voronoi.hs  -o voronoi</code></pre>
+<p>My machine is a somewhat oldish 2GHz Intel Core 2 Duo with 4GB (1067Mhz DDR3) of RAM. We can try to run it on one core:</p>
+<pre><code>$ time ./voronoi
+
+real	0m3.015s
+user	0m2.946s
+sys	0m0.069s</code></pre>
+<p>or on two cores:</p>
+<pre><code>$time ./voronoi +RTS -N2
+
+real	0m1.644s
+user	0m3.101s
+sys	0m0.068s</code></pre>
+<p>Note that the speedup is pretty good. We can also see detailed statistics by the runtime system:</p>
+<pre><code>$ ./voronoi +RTS -N2 -s
+   8,750,790,680 bytes allocated in the heap
+       5,940,344 bytes copied during GC
+         852,168 bytes maximum residency (2 sample(s))
+          49,752 bytes maximum slop
+               5 MB total memory in use (2 MB lost due to fragmentation)
+
+                                  Tot time (elapsed)  Avg pause  Max pause
+Gen  0      8640 colls,  8639 par    0.15s    0.11s     0.0000s    0.0033s
+Gen  1         2 colls,     2 par    0.00s    0.00s     0.0003s    0.0005s
+
+  Parallel GC work balance: 1.78 (690765 / 388167, ideal 2)
+
+                        MUT time (elapsed)       GC time  (elapsed)
+  Task  0 (worker) :    3.00s    (  1.57s)       0.18s    (  0.13s)
+  Task  1 (worker) :    3.18s    (  1.69s)       0.00s    (  0.00s)
+  Task  2 (bound)  :    3.18s    (  1.69s)       0.00s    (  0.00s)
+  Task  3 (worker) :    2.97s    (  1.54s)       0.21s    (  0.15s)
+
+  SPARKS: 0 (0 converted, 0 overflowed, 0 dud, 0 GC&#39;d, 0 fizzled)
+
+  INIT    time    0.00s  (  0.00s elapsed)
+  MUT     time    3.03s  (  1.59s elapsed)
+  GC      time    0.15s  (  0.11s elapsed)
+  EXIT    time    0.00s  (  0.00s elapsed)
+  Total   time    3.18s  (  1.69s elapsed)
+
+  Alloc rate    2,884,832,617 bytes per MUT second
+
+  Productivity  95.3% of total user, 179.1% of total elapsed
+
+gc_alloc_block_sync: 3416
+whitehole_spin: 0
+gen[0].sync: 0
+gen[1].sync: 3</code></pre>
+<p>95% user productivity looks good to me. By comparison, and unoptimized single-core <code>C</code> version out of <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> takes somewhat less than 2 seconds, while the optimized one takes around half a second.</p>
+<p>Please, take the times above with a grain of salt: I am sure a seasoned haskeller would squeeze more speed out of my version, and probably the <code>C</code> and the Haskell should’nt be compared in the first place (the output image format is different).</p>
+<h2 id="conclusions">Conclusions</h2>
+<p>As we have seen, writing parallel array operations with a decent performance is easy with <code>Repa</code>. While I am doubtful that it can reach the speed of <code>C</code> without making the code just too ugly, IMHO the balance between speed, ease of development and compositional style makes <code>Repa</code> a worthwhile tool in your bag.</p>
+<h2 id="references">References</h2>
+<p>Here are some cool links if you want to play around with Voronoi diagrams:</p>
+<ul>
+<li><a href="http://bl.ocks.org/mbostock/4060366">Online demo</a></li>
+<li><a href="http://www.raymondhill.net/voronoi/rhill-voronoi.html">Another one</a></li>
+<li><a href="http://www.senchalabs.org/philogl/PhiloGL/examples/voronoi/">A spherical one</a></li>
+<li><a href="http://voronoi.com/wiki/index.php?title=Main_Page">The vorowiki</a></li>
+</ul>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/haskell.html">haskell</a>, <a href="/tags/voronoi.html">voronoi</a>, <a href="/tags/repa.html">repa</a>, <a href="/tags/parallel.html">parallel</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+]]></description>
+    <pubDate>Sat, 14 Dec 2013 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html</guid>
+</item>
+<item>
+    <title>Haskell Gotchas: Strings</title>
+    <link>http://jarnaldich.me/blog/2013/09/08/haskell-gotchas-strings.html</link>
+    <description><![CDATA[<h3>Haskell Gotchas: Strings</h3>
+
+<small>Posted on September  9, 2013 <a href="/blog/2013/09/08/haskell-gotchas-strings.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>I’ve been playing with <a href="http://www.haskell.org">Haskell</a> on and off for some time now. Let’s face it: it’s not an easy language to learn. I would agree with most people that part of the difficulty comes from its unique features (laziness, purity, etc…), and the abstractions that derive from them when facing real-world problems (Monads, Iteratees, etc…), but my point here is that there are other sources of confusion that keep misleading beginners like myself and that have nothing to do with all that.</p>
+<!-- more -->
+<p>In fact, I can see a pattern in those <a href="http://catb.org/~esr/jargon/html/G/gotcha.html">gotchas</a>: Haskell often provides several tools for a particular task. It is (too) often the case that the one that’s most at hand, or that seems to be favored in the docs, is just not what a newbie would expect. I think this fact has an impact on the perception of first-time users, if they do not perservere enough to seek for alternatives.</p>
+<p>I am planning to write a series of posts on these gotchas, if only to prevent myself from falling into the same traps the next time I decide to take on Haskell again, and in the hope they will be useful to other learners. Please mind that I have no valorative intetion whatsoever (no flames: it is not a Haskell WTF), and that this is not the work of a seasoned Haskeller: if you find any mistakes in these posts, please report so I can correct them and learn something.</p>
+<h1 id="strings">Strings</h1>
+<p>This is a paradigmatic case, and probably the reason for many newbies walking away from Haskell wondering how come a compiled language can perform <a href="http://honza.ca/2012/10/haskell-strings">so much worse</a> than, say, Python.</p>
+<p>To recap, Haskell has a <code>String</code> type. Now, for any non-trivial text processing you can pretty much forget about it. In Haskell, the <code>String</code> type is defined as a regular list of <code>Char</code>, and if you’ve had some previous exposure to functional lists (with their <code>car</code>s and <code>cdr</code>s, <code>head</code>s and <code>tail</code>s, …) you’ll know how different a beast they are from the sort of <code>char</code>/<code>wchar</code> array most newcomers would expect for a string implementation.</p>
+<p>Of course, Haskell ships with a bunch of modules designed to work as <code>String</code> replacements in its standard library. By replacement I mean that the names of the functions are kept consistent so that, if you use qualified imports, it <em>should, in theory</em> be easy to switch between them. Now, these modules not only change the underlying implementation of a string, but also provide the functions to perform IO according to the type, so they come in <em>strict IO</em> and <em>lazy IO</em> flavors: the <em>gotcha</em> here is that this can dramatically change the <em>semantics</em> of input/output on the importing module, so switching between them is not always that easy, <em>in practice</em>.</p>
+<p>I have deribelately avoided to tackle the subtleties of lazy IO in this post (I may keep that for another gotcha). Take a look at <a href="http://www.haskell.org/haskellwiki/Iteratee_I/O#The_problem_with_lazy_I.2FO">this</a> if you can’t wait. At the moment, my advice for a newcomer would be to start with the strict versions, because they are closer to the behaviour you’d expect in most other languages.</p>
+<p>If you have already been doing IO in Haskell with <code>Strings</code> and <code>System.IO</code>, then you have already been doing <em>lazy</em> IO, since it’s the default. When in doubt, you can always try both and see which one (if any) matches your performance expectations.</p>
+<h2 id="the-basics">The Basics</h2>
+<p>Here’s what most Haskellers would recommend:</p>
+<p><strong>If you do not care about Unicode</strong>, use <code>Data.ByteString.Char8</code>, which is a packed array of <code>Char8</code> (bytes). The lazy variant is <code>Data.ByteString.Lazy.Char8</code>. This will be enough if you can assume your input is in (a subset of) <em>latin-1</em>.</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.ByteString.Char8</span> <span class="kw">as</span> <span class="dt">B</span></code></pre>
+<p>or</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.ByteString.Lazy.Char8</span> <span class="kw">as</span> <span class="dt">B</span></code></pre>
+<p><strong>If you care about Unicode</strong>, go use <code>Data.Text.Text</code>:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
+<span class="kw">import qualified</span> <span class="dt">Data.Text.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></code></pre>
+<p>or</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text.Lazy</span> <span class="kw">as</span> <span class="dt">T</span>
+<span class="kw">import qualified</span> <span class="dt">Data.Text.Lazy.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></code></pre>
+<p>If you need regular expressions with Unicode, though, the thing gets a little more <a href="http://stackoverflow.com/questions/14922579/haskell-regular-expressions-and-data-text">involved</a>.</p>
+<h2 id="back-and-forth">Back and forth</h2>
+<p>Even if you use these types, you will still need <code>Prelude.String</code> in your code: there are a lot of libraries which will expect and return <code>String</code>s. As an example, the <code>FilePath</code> type for file and directory manipulation is just an alias for <code>String</code>. Also, every string literal in your code will be parsed as a <code>String</code> by default (but see below), so converting from <em>packed</em> <code>ByteArrays</code> to <em>unpacked</em> <code>String</code>s is achived, not surprisingly, by the functions <code>pack</code> and <code>unpack</code>. In fact, using <code>String</code> in your APIs, as long as they’re not too large, is one (the only?) sensible use for <code>Strings</code>.</p>
+<p>For the <a href="http://www.haskell.org/ghc/">GHC</a> stack you can avoid packing and unpacking string literals by using the <code>OverloadedStrings</code> pragma. Ie. instead of writing:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
+myFuncExpectingDataText <span class="fu">.</span> T.pack <span class="fu">$</span> <span class="st">&quot;Hello World!&quot;</span></code></pre>
+<p>you can add the pragma that makes the call to <code>T.pack</code> unnecessary:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span>
+<span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
+myFuncExpectingDataText <span class="st">&quot;Hello World!&quot;</span></code></pre>
+<h2 id="conclusions">Conclusions</h2>
+<p>Here’s my piece of advice:</p>
+<ul>
+<li>Avoid <code>Prelude.String</code> for text processing, but bear in mind it is sort of standard when defining your APIs.</li>
+<li>If you care for Unicode, go for <code>Data.Text</code>, if the latin-1 subset is enough for you, stick to <code>Data.ByteString</code>, since regular expressions (and other tasks) are easier there.</li>
+<li>If you are starting and the performance is enough for your use-case, go for the strict IO. The behaviour is more predictable.</li>
+</ul>
+<p>A final note: this is, by far, not the last word regarding <code>String</code>s in Haskell. For example, there are abstractions that aim to solve the predictability issues problems of lazy IO while keeping performant (for example, <a href="http://www.haskell.org/haskellwiki/Iteratee_I/O">Iteratees</a> or <a href="http://www.haskell.org/haskellwiki/Conduit">Conduits</a>. I just think this is the bare minimum to be able to do text-processing in Haskell.</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/haskell.html">haskell</a>, <a href="/tags/gotchas.html">gotchas</a>, <a href="/tags/strings.html">strings</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2013/09/08/haskell-gotchas-strings.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+]]></description>
+    <pubDate>Mon, 09 Sep 2013 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2013/09/08/haskell-gotchas-strings.html</guid>
+</item>
+<item>
+    <title>Raw Strings in Factor</title>
+    <link>http://jarnaldich.me/blog/2013/02/24/raw-strings-in-factor.html</link>
+    <description><![CDATA[<h3>Raw Strings in Factor</h3>
+
+<small>Posted on February 24, 2013 <a href="/blog/2013/02/24/raw-strings-in-factor.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>Ok, you may think I have a fixation with <a href="/blog/2011/08/07/raw-strings-in-racket.html">raw strings</a>, but if you’re like most developers and have used different languages through the years, you probably know the feeling of wanting to port your favourite features from language to language.</p>
+<!-- more -->
+<p>Most languages just won’t let you do anything about it, but then, happily, there is also a whole family of <em>programmable programming languages</em>: <a href="http://www.paulgraham.com/chameleon.html">Lisps</a> being the most notable members among them.</p>
+<p>But there are, for sure, other languages in other sometimes forgotten paradigms.</p>
+<h2 id="concatenative">Concatenative</h2>
+<p><a href="http://factorcode.org">Factor</a> is a so-called <a href="http://concatenative.org/wiki/view/Concatenative%20language">concatenative</a> language. More precisely, it a <a href="http://c2.com/cgi/wiki?StackBasedLanguage">stack-based one</a>. What sets it apart from other concatenative languages IMHO is that it’s a <em>general purpose</em> (Forth is more oriented towards embedded systems) <em>practical</em> (not just a theoretical tool) and <em>modern</em>: its creator Slava Pestov and the development team have brilliantly shown how object orientation, incremental compilation, and bunch of advanced language features can be put to work in a concatenative language.</p>
+<h2 id="factor-as-a-shell">Factor as a shell</h2>
+<p>Factor has a very terse syntax. This can be good or bad, depending on your application and the way your brain is wired up. Lately, I’ve started using its <a href="http://re-factor.blogspot.com.es/2010/09/visual-repl.html">visual repl</a> as an os shell on steroids (I’ll eventually blog on the experience). I think it makes sense since I spend a good share of my time on Windows and I’m not crazy about the syntax of Powershell. A shell is clearly one of the applications where less typing is just the right thing, and the stack-based model sometimes feels like a natural upgrade of unix piping (I’m thinking of the <a href="http://docs.factorcode.org/content/article-dataflow-combinators.html">dataflow combinators</a> here).</p>
+<h2 id="raw-strings">Raw strings</h2>
+<p>And, of course, being able to shamelessly use backslashes inside strings is something you ask of a windows shell. I want to be able to type something like:</p>
+<pre class="factor"><code>r| \\Server\share| directory-files</code></pre>
+<p>Notice the space after the first vertical bar. This is typical of Factor, you’ll see why in a moment.</p>
+<p>As a Factor newbie, there are two things you can do. One is to RTFM, which is extensive and well-written:</p>
+<blockquote>
+<p>The Factor parser follows a simple recursive-descent design. The parser reads successive tokens from the input; if the token identifies a number or an ordinary word, it is added to an accumulator vector. Otherwise if the token identifies a parsing word, the parsing word is executed immediately.</p>
+</blockquote>
+<p>The other one is to check the implementation of something close to what’s intended. This is extremely easy in Factor, since most of the Factor libraries are implemented in Factor itself and the help system lets you navigate through the definitions. The solution presented here is inspired by the regex-introducing parsing word <a href="http://docs.factorcode.org/content/word-R__slash__,regexp.html"><code>R/</code></a>.</p>
+<p>So it looks like we’ll need to introduce a word that will hook up to a function whose responsibility will be to push a string into the accumulator. Something like:</p>
+<pre class="factor"><code>SYNTAX: r| CHAR: | parsing-raw ;</code></pre>
+<p>This means that the parser will immediately evaluate <code>124 parsing-raw</code> after seeing the introductory <code>r|</code>. since this introductory word is handled by the default lexer and parser, there needs to be a space after it for Factor to process the end of word. This might seem unnatural if you do not know Factor, but it is consistent with the rest of the language.</p>
+<p>124 is the ascii code for the vertical bar, which will act as a terminator of the string to parse. Passing the terminator as a parameter will make things easier if we decide to change the separators someday.</p>
+<h2 id="the-lexer">The lexer</h2>
+<p>For our purpose, we cannot work at the parser level: we don’t deal with words, numbers or already-constructed strings. If we want to construct a Factor string in a different way, we’ll have to call the lexer directly. The lexer is stored in a <a href="http://docs.factorcode.org/content/article-namespaces.html">dynamic variable</a> named <code>lexer</code>.</p>
+<pre class="factor"><code>: parsing-raw ( accum end -- accum )
+        lexer get take-until suffix! ;</code></pre>
+<p><code>parsing raw</code> is reponsible for taking input until the <code>end</code> character (124) is reached, and then suffixing the accumulator with the newly parsed string.</p>
+<p>The actual parsing is done in the <code>take-until</code> word:</p>
+<pre class="factor"><code>: take-until ( end lexer -- string )
+        [
+                [ 1 + ] dip
+                [ index-from ] 2keep
+                [ swapd subseq ]
+                [ 2drop 1 + ] 3bi
+        ] change-lexer-column ;</code></pre>
+<p>The word <code>change-lexer-column</code> calls its quotation with the column and the line text of the lexer at that moment. The first line, then, just skips that blank we talked earlier following the introductory word <code>r|</code>. The next two lines find the positon of the terminator (<code>index-from</code>) and extract the string accordingly (<code>subseq</code>). At the end of the quotation <code>change-lexer-column</code> finds the new lexer column at the top of the stack, and just below it lies our return value: the raw string.</p>
+<p>Let’s give it a try:</p>
+<pre class="factor"><code>IN: scratchpad r| \\Server\share|
+
+--- Data stack:
+&quot;\\\\Server\\share&quot;
+IN: scratchpad </code></pre>
+<h2 id="conclusion">Conclusion</h2>
+<p>Extending Factor’s syntax is quite straightforward. The linked documentation system and source code browser are an extremely helpful resource to learn the language.</p>
+<p>As pointed out after a question in the <a href="http://dir.gmane.org/gmane.comp.lang.factor.general">mailing list</a>, my solution lacks a way to escape characters. Check out the reference at the end of the article to see how Factor’s “real” string parser deals with them.</p>
+<h2 id="resources">Resources</h2>
+<ul>
+<li>Slava’s post on <a href="http://factor-language.blogspot.com.es/2009/09/survey-of-domain-specific-languages-in.html">writing DSLs on Factor</a> gives a nice overview of Factor’s self-modifying capabilities.</li>
+<li>The <a href="http://docs.factorcode.org/content/article-parsing-words.html">docs</a> of course.</li>
+<li>The <a href="https://github.com/slavapestov/factor/blob/master/core/strings/parser/parser.factor">string parser code</a>, to see how “real” Factor strings are parsed. Interesting to see how Factor deals with escape characters.</li>
+</ul>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/factor.html">factor</a>, <a href="/tags/concatenative.html">concatenative</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2013/02/24/raw-strings-in-factor.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+]]></description>
+    <pubDate>Sun, 24 Feb 2013 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2013/02/24/raw-strings-in-factor.html</guid>
+</item>
+<item>
+    <title>Raw Strings in Racket</title>
+    <link>http://jarnaldich.me/blog/2011/08/07/raw-strings-in-racket.html</link>
+    <description><![CDATA[<h3>Raw Strings in Racket</h3>
+
+<small>Posted on August  7, 2011 <a href="/blog/2011/08/07/raw-strings-in-racket.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>One of the features I missed from the outstanding lisp dialect <a href="http://www.racket-lang.org/">Racket</a> (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language’s ability to extend its own syntax.</p>
+<!-- more -->
+<p><strong>2011-08-14 UPDATE:</strong> This article can be used as a tutorial for implementing readtable extensions to Racket. If you just want the functionality, you can achieve it with the <code>at-exp</code> language, already included in Racket’s distribution. Just skip to the <a href="#at-exp">at-exp</a> section at the end of this tutorial to see how.</p>
+<h1 id="the-problem">The problem</h1>
+<p>This will probably sound familiar to any of you using windows paths or regexes in a language with strings supporting backslash escape sequences. Essentially, the problem is that instead of writing, for example:</p>
+<pre class="racket"><code>(directory-list &quot;\\MACHINE\Share\directory&quot;)</code></pre>
+<p>You need to write:</p>
+<pre class="racket"><code>(directory-list &quot;\\\\MACHINE\\Share\\directory&quot;)</code></pre>
+<p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@&quot;&quot;</code> syntax, then you’d probably miss the feature.</p>
+<h1 id="the-plan">The plan</h1>
+<p>Racket is extensible by design. When we run a racket program, there are several stages involved:</p>
+<ol style="list-style-type: decimal">
+<li><p>First, a <em>reader</em> layer turns a stream of characters into a kind of AST. Since racket is a lisp, this AST is, of course, made up of s-expressions. But in Racket’s case, they’re a particular kind of s-expressions which contain extra information on their lexical scope and their source location, and are called <em>syntax objects</em>.</p></li>
+<li><p>After that, those syntax objects are further expanded through the macro layer.</p></li>
+</ol>
+<p>The extension architecture in Racket will let you “plug” your extension into existing languages, so in the process of creating a new language you can (and usually will) build upon existing features.</p>
+<p>Our purpose, then, is to build a new language on top of racket by tuning the reader so that we can pass strings verbatim to the expander layer.</p>
+<h1 id="the-reader-extension">The reader extension</h1>
+<p>Racket provides a standard way to extend the reader by writing the so called <em>reader extensions</em>. Those are modules that implement the <code>read</code> and <code>read-syntax</code> functions. Remember lisp is code-as-data? <code>read</code> is called when forms are to be used as data, and can return any kind of value; <code>read-syntax</code> is called when forms are to be interpreted as code, since its output is a syntax object. Apart from the source location and scope, their behaviour should be equivalent not to mislead the users, so you can implement <code>read</code> from <code>read-syntax</code> just by stripping the lexical information.</p>
+<p>The implementation is listed below:</p>
+<pre class="racket"><code>(require syntax/readerr)
+(provide read read-syntax)
+
+(define (read in)
+  (syntax-&gt;datum (read-syntax #f in)))
+
+(define (read-syntax src in)
+  
+  (define opening-char (read-char in))
+  (define closing-str (case opening-char
+                         [(#\() &quot;\\)&quot;]
+                         [(#\[) &quot;\\]&quot;]
+                         [(#\{) &quot;\\}&quot;]
+                         [else (string opening-char)]))
+  
+  (define regex (pregexp (string-append &quot;^.*?&quot; closing-str)))
+  
+  (define-values (line col pos) (port-next-location in))
+  
+  (define raw-str (regexp-match regex in))
+  
+  (unless raw-str 
+    (raise-read-error &quot;bad raw string syntax&quot;
+                      src line col pos
+                      (- (file-position in) pos)))
+  
+  (define (strip-last-char s)
+    (substring s 0 (- (string-length s) 1)))
+
+  (define (to-syntax v)
+    (datum-&gt;syntax #f ; lexical context. read-syntax should have no lexical context
+                   v; Value
+                   (vector src ; File, normally syntax-source
+                           line  ; line
+                           col  ; column
+                           pos  ; character since beginning of source
+                           (string-length v)  ; the span (width)
+                           ))) ; check location info
+  
+  (to-syntax  (strip-last-char (bytes-&gt;string/locale (car raw-str)))))</code></pre>
+<p>If you name the above module as <code>reader_extension.rkt</code>, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending <code>#reader&quot;reader_extension.rkt&quot;</code>. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it’s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.</p>
+<p>See these rackunit tests for an example:</p>
+<pre class="racket"><code>(require rackunit)
+(check-equal? #reader&quot;reader_extension.rkt&quot;(\\TEST\One) 
+              &quot;\\\\TEST\\One&quot;)
+
+(check-equal? #reader&quot;reader_extension.rkt&quot;_\test\no\escape_ 
+              &quot;\\test\\no\\escape&quot;)</code></pre>
+<h1 id="the-readtable-hook">The readtable hook</h1>
+<p>While the above fully works, It may not save much typing having to write <code>#reader&quot;reader_extension.rkt&quot;</code> instead of manually backslashing the string. It would be more convenient to just use one character, for example <code>$</code>, like this:</p>
+<pre class="racket"><code>(directory-list $(\\SERVER\Share))</code></pre>
+<p>Fortunately, that’s pretty easy: the racket reader is implemented as a recursive descent parser, and you can hook your own functions to call back when the parser sees a character. This association between characters and callbacks is known as the readtable.</p>
+<p>The readtable has a dynamic scope (it’s a <code>parameter</code>), and every call to the <code>read</code> and <code>read-syntax</code> functions is performed in the context of a readtable. There is, of course, a starting default readtable in case the user didn’t specify one.</p>
+<h1 id="using-the-extension-as-a-language">Using the extension as a language</h1>
+<p>The other drawback of using the <code>#reader&quot;reader_extension.rkt&quot;</code> prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:</p>
+<pre class="racket"><code>#lang with-raw-string racket #\%
+(regexp-split (pregexp %&#39;\s&#39;) &quot;two fields&quot;)</code></pre>
+<p>Meaning that you add raw string syntax on top of the <code>racket</code> language with <code>%</code> as your readtable character.</p>
+<h1 id="the-syntax-modulereader-language">The syntax-module/reader language</h1>
+<p>Fortunately, both problems can be solved by using the syntax/module-reader language, which is a helper language for installing your own languages into a Racket distribution.</p>
+<p>All you need to do is locate the collects dir <code>(find-user-collects-dir)</code> and place the “reader_extension.rkt” in a subdirectory called <code>with-raw-string/lang</code> together with a <code>reader.rkt</code> with this contents:</p>
+<pre class="racket"><code>(module reader syntax/module-reader
+  #:language read 
+  #:wrapper2 (lambda (in rd)
+               (parameterize ([current-readtable 
+                               (make-raw-str-readtable (read in))])
+                 (rd in)))
+  
+  (require syntax/readerr
+           (prefix-in raw: &quot;reader_extension.rkt&quot;))
+    
+  (define readtable-hook
+    (case-lambda
+      [(ch in)
+       (raw:read in)]
+      [(ch in src line col pos)
+       (raw:read-syntax src in)]))
+  
+  (define (make-raw-str-readtable c)
+    (make-readtable (current-readtable)
+                    c &#39;terminating-macro readtable-hook)))</code></pre>
+<p>The interesting points are:</p>
+<ul>
+<li><p>The <code>make-raw-str-readtable</code> will create a readtable that will call the <code>reader_extension</code> functions with its character argument.</p></li>
+<li><p>The <code>#:language</code> keyword will let you specify the underlying language. It can be a literal or a callback function. In this case we use the <code>read</code> function as a callback, so that we read the underlying language from the input stream.</p></li>
+<li><p>The <code>#:wrapper2</code> callback will parameterize both <code>read</code> and <code>read-syntax</code> with the quote-character enhanced readtable. Note that the quoting char is also read from the input stream first.</p></li>
+</ul>
+<p><a name="at-exp" > </a> # UPDATE: The <code>at-exp</code> language</p>
+<p>After posting a link to this tutorial to the <code>users@racket-lang.org</code> mailing list (a very active and helpful list for Racket users), Eli Barzilay (one of Racket’s core developers) pointed out that the [at-exp](http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp) language could be used to achieve the same results. This language acts at the reader level and was originally developed for <a href="http://docs.racket-lang.org/scribble/index.html?q=scribble">scribble</a> (a family of languages for writing textual content, such as racket’s documentation itself).</p>
+<p>Basically, <code>at-exp</code> extends another language (passed in as a parameter, like the one in this tutorial), so that expressions of the form:</p>
+<pre class="racket"><code>@func{Text here}</code></pre>
+<p>make it to the expansion layer like</p>
+<pre class="racket"><code>(func &quot;Text here&quot;)</code></pre>
+<p>Where text is read literally (no backslash substitution). So here’s a way to achieve the same functionality we expected just by what’s already provided by Racket:</p>
+<pre class="racket"><code>#lang at-exp racket
+(define r string-append)
+(display @r{...nearly free text here...})</code></pre>
+<p>When using <strong>DrRacket</strong>, you can press the <em>Macro Stepper</em> button to see how the above is read:</p>
+<pre class="racket"><code>(module anonymous-module racket
+  (#%module-begin
+   (define r string-append)
+   (display (r &quot;...nearly free text here...&quot;))))</code></pre>
+<p>Of course, the <code>r</code> is there just to make the syntax shorter… you could just use <code>string-append</code> each time. There is also another way to pass parameters to the <code>@</code> functions, which is not relevant here, through <code>[]</code>. Check the [docs](http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp) for the details.</p>
+<h1 id="conclusions">Conclusions</h1>
+<p>You see how easy it is to add new features on top of the Racket language. How many languages do you know that you can modify to match your needs in this way?</p>
+<p>BTW, The above code is available at <a href="http://github.com/jarnaldich/with-raw-string">github</a>.</p>
+<h1 id="further-reading">Further Reading</h1>
+<p>Check out <a href="http://docs.racket-lang.org/guide/languages.html">the excellent Racket documentation</a> on creating new languages for racket. Seriously, the racket documentation system is as impressive as Racket itself.</p>
+<p>Check out <a href="http://hashcollision.org/brainfudge/">This article</a> for a more complete example on how to design a Turing-complete (but maybe not that useful) language in Racket.</p>
+<p>Check out <a href="http://matt.might.net/articles/implementing-a-programming-language/">This other article</a> to see how to develop an interpreter for two small languages, but without using Racket’s language extension mechanisms (evaluation is performed at run-time, through an eval function).</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/racket.html">racket</a>, <a href="/tags/scheme.html">scheme</a>, <a href="/tags/lisp.html">lisp</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2011/08/07/raw-strings-in-racket.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+]]></description>
+    <pubDate>Sun, 07 Aug 2011 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2011/08/07/raw-strings-in-racket.html</guid>
+</item>
+<item>
+    <title>Run Legacy Apps as Windows Services</title>
+    <link>http://jarnaldich.me/blog/2011/07/13/cygrunsrv.html</link>
+    <description><![CDATA[<h3>Run Legacy Apps as Windows Services</h3>
+
+<small>Posted on July 13, 2011 <a href="/blog/2011/07/13/cygrunsrv.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>Although the right thing to do when programming a windows service is to use Microsoft’s API from the very beginning, it may also be desirable to run a regular executable as a service.</p>
+<!-- more -->
+<p>A typical candidate would be a legacy TCP server, so that you get:</p>
+<ul>
+<li>automatic startup without login.</li>
+<li>integration with third-party monitoring apps.</li>
+<li>the ability to define failure recovery policies.</li>
+</ul>
+<p>Microsoft had already noticed this, so they provide the executable <a href="http://support.microsoft.com/kb/137890">SRVANY</a> as part of the <strong>Windows Resource Kit</strong>; but sometimes installing the whole resource kit may not be an option, specially in a production server.</p>
+<p>It would be nicer to have a small application you could just xcopy-deploy that would allow you to install, remove and update the properties of your service candidate.</p>
+<h1 id="the-solution">The solution</h1>
+<p>Here’s where <a href="http://www.cygwin.com/">CygWin’s</a> little {{cygrunsrv}} comes handy. Notice that, although it behaves nicely with cygwin apps, it can be used with <strong>any</strong> Win32 executable.</p>
+<p>To use it, you just need to put the files <code>cygrunsrv.exe</code> and <code>cygwin1.dll</code> in the same directory and go. Unfortunately, both files lie in different packages and cannot, AFAIK, be downloaded on their own, so the first time you’ll have to download and uncompress the files {{cygrunsrv-1.34.1.tar.bz2}} and {{cygwin-1.7.9-1.tar.bz2}}, (version may differ in the future) from whatever mirror is most suitable for you.</p>
+<p>The full documentation for this tool is <a href="http://web.mit.edu/cygwin/cygwin_v1.3.2/usr/doc/Cygwin/cygrunsrv.README">here</a>.</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/win32.html">win32</a>, <a href="/tags/services.html">services</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2011/07/13/cygrunsrv.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+]]></description>
+    <pubDate>Wed, 13 Jul 2011 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2011/07/13/cygrunsrv.html</guid>
+</item>
+<item>
+    <title>Blogging with Jekyll</title>
+    <link>http://jarnaldich.me/blog/2011/07/01/first-post.html</link>
+    <description><![CDATA[<h3>Blogging with Jekyll</h3>
+
+<small>Posted on July  1, 2011 <a href="/blog/2011/07/01/first-post.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>… or, “from static to dynamic and back again”.</p>
+<p>I’ve finally decided to set-up a new technical blog. I think one of the main reasons it took me so long to start was that I couldn’t find an engine that matched my taste. Ok… as a coder, my taste is not exactly that of a final user.</p>
+<!-- more -->
+<ul>
+<li>I didn’t want to pay. I woult have felt a bit dumb knowing I could be using something like <a href="http://www.wordpress.com">WordPress</a> or <a href="http://www.blogger.com">Blogger</a> for free even if they’re not exactly what I’m looking for.</li>
+<li>I don’t think storing pages in a relational DB is the smartest thing to do. Relational DBs are for structured data, not documents.</li>
+<li>I want to be able to use the tools I learned to love as a coder in my posts. After all, It’s all about text, right? I want versioning, regexp searches, and all that good old unix tools for text processing.</li>
+<li>I’d rather die than use a web-based editor.</li>
+<li>I want to be able to produce high quality, standards compliant and easily modifyable html… but authoring in a more human-friendly markup, of course…</li>
+<li>I don’t want to be stuck to a system once I’ve started. What I care most is content. I want to be able to migrate my posts whenever I want.</li>
+<li>The system should be elegant, not a bunch of scripts tied together.</li>
+</ul>
+<p>After reading <a href="http://tom.preston-werner.com/2008/11/17/blogging-like-a-hacker.html">this post</a>, it became clear that what I wanted was a <em>static</em> site generator.</p>
+<p>Static? But that’s soooo 1990s… well yes… and no. I’ve you’ve ever tried to roll your own blog engine (a common web framework learning exercice), and got to the point of optimization, you may have come to realize that you can cache most, if not all, your content… mmmmm… This is certainly oversimplifying, but you get the point:</p>
+<p>DYNAMIC + A WHOLE LOT OF CACHING = STATIC</p>
+<p>The other, probably most relevant, difference from the 90s is the mashups culture. Your web app can rely on third party services for its dynamic parts. (IMHO, Even if you are able to serve dynamic content, it’s still interesting to use some of those services).</p>
+<p>Now that you know the <em>whys</em>, let’s talk about the <em>hows</em>.</p>
+<h2 id="jekyll">Jekyll</h2>
+<p>There are several static page generators out there (just Google for them). I feel confident with Ruby, but the key point here was <a href="http://pages.github.com/">Github Pages</a> having automatic <a href="http://jekyllrb.com/">Jekyll</a> processing (no suprise: jekyll’s author is one of the Github founders).</p>
+<p>I must admit I am curious about <a href="http://jaspervdj.be/hakyll/">Hakyll</a> too…</p>
+<p>With jekyll, you get:</p>
+<ul>
+<li>A full templating system based on markup authoring run through <a href="http://www.liquidmarkup.org/">liquid</a>-powered templates.</li>
+<li>Syntax highlighting (through) pygments. Just install it and run with the <code>--pygments</code> option.</li>
+<li>Tagging (not directly, but easy to add).</li>
+<li>A content-based related posts feature.</li>
+</ul>
+<p>Plus, of course, the possibility to store your blog at GitHub.</p>
+<h2 id="comments-system">Comments system</h2>
+<p>There are some good reasons for using a third party comment system instead of your own (security, merging different sources, statistics…), even if you can serve dynamic content. For this blog I chose <a href="http://disqus.com/">disqus</a>, but there are others…</p>
+<h2 id="github">Github</h2>
+<p>Both the content and the templates for this blog are hosted at a Github free account, which will even let you redirect your domain. You can check the source code, fork the repo or whatever <a href="https://github.com/jarnaldich/jarnaldich.github.com">here</a>.</p>
+<h2 id="updates-as-of-feb-2013">Updates as of Feb 2013</h2>
+<p>Some other tools have sprung around github pages / Jekyll. If I started blogging now I’d probably check them out:</p>
+<ul>
+<li><a href="http://octopress.org">Octopress</a> Is built on top of Jekyll to help hackers with the boring part of setting up a bloc (css, html templates, etc…).</li>
+<li><a href="http://jekyllbootstrap.org">Jekyll bootstrap</a> Helps setting up a github pages account. There’s a new project by the same author that aims to be language agnostic called <a href="http://ruhoh.com">ruhoh</a>.</li>
+</ul>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/jekyll.html">jekyll</a>, <a href="/tags/blogging.html">blogging</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2011/07/01/first-post.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+]]></description>
+    <pubDate>Fri, 01 Jul 2011 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2011/07/01/first-post.html</guid>
+</item>
+
+    </channel> 
+</rss>

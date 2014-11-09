@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <title>Joan Arnaldich - Parallel Voronoi in Haskell</title>
+
+        <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+
+        <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+    </head>
+    <body>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <div class="page-header">
+                        <h1>Joan Arnaldich<sup class="sup-title">(can code)</sup></h1>
+
+                        <div style="margin-top:20px;">
+                            <div class="row">
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <h3>Parallel Voronoi in Haskell</h3>
+
+<small>Posted on December 14, 2013 <a href="/blog/2013/12/14/haskell-voronoi.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>I recently bought a copy of <em>Parallel and Concurrent Programming in Haskell</em>, by Simon Marlow, also available online <a href="http://chimera.labs.oreilly.com/books/1230000000929">here</a>. It’s a very good overview for anyone who (like me) has ever been confused by the wealth of different libraries and primitives for doing concurrency &amp; parallelism in Haskell.</p>
+<p>So I thought I would put what I learned to work with an example of my own. <!-- more --></p>
+<h2 id="repa">Repa</h2>
+<p>A library I found particularly compelling was <a href="http://hackage.haskell.org/package/repa">repa</a>. Quoting from the <a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial">tutorial</a>,</p>
+<blockquote>
+<p>Repa is a Haskell library for high performance, regular, multi-dimensional parallel arrays. All numeric data is stored unboxed and functions written with the Repa combinators are automatically parallel…</p>
+</blockquote>
+<p>Let’s describe what makes <code>repa</code> fast step by step. Note that <code>repa</code> heavily relies on the optimizations performed by the <a href="http://www.haskell.org/ghc/">GHC</a>, so whenever I say Haskell in this post, please think of the <code>GHC</code> stack.</p>
+<h3 id="unboxed-types">Unboxed types</h3>
+<p>Like in many other high-level languages, the default types in GHC are <em>boxed</em>, meaning that they are represented by a pointer to a object in the heap, rather than a primitive type itself. The use of boxed types adds one level of indirection and thus has an impact on performance because of the extra allocation and the loss of locality.</p>
+<p>You can read more about unboxed types <a href="http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html">in the manual</a>.</p>
+<h3 id="stream-fusion">Stream fusion</h3>
+<p>Consider a function like this:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
+squareAddTwo <span class="fu">=</span> sum <span class="fu">.</span> map (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> map (<span class="fu">*</span><span class="dv">3</span>) </code></pre>
+<p>It is supposed to multiply each element in an integer list by three, add two, and then sum up all the numbers in the list. A naive implementation of the above would use 3 lists: the input list and two intermediate lists for storing the result of the two <code>map</code> operations. These intermediate lists waste time and space doing useless temporary allocation and garbage collection.</p>
+<p>Now, with stream fusion, equational laws are applied to get rid of these intermediate structures in a process called deforestation. The above could be translated into something like:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">myFoldingSquareAddTwo <span class="fu">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="fu">+</span> (y<span class="fu">*</span><span class="dv">3</span> <span class="fu">+</span> <span class="dv">2</span>)) <span class="dv">0</span></code></pre>
+<p>Note that recent versions of GHC have deforestation built-in for regular lists, so you can take advantage of fusion provided you stick to the old suspects: <code>map</code>, <code>fold</code>, etc… If you implement your own recursive functions, then GHC will <em>not</em> be able to fuse. Here is a snippet that you can play with. I encourage you to try what is the largest value of <code>n</code> for which this program correctly terminates:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span>
+<span class="kw">import </span><span class="dt">System.Environment</span>
+<span class="kw">import </span><span class="dt">Data.List</span> (foldl&#39;)
+    
+myMap f [] <span class="fu">=</span> []
+myMap f (h<span class="fu">:</span>t) <span class="fu">=</span> f h <span class="fu">:</span> myMap f t
+
+mySum [] <span class="fu">=</span> <span class="dv">0</span>
+mySum (h<span class="fu">:</span>t) <span class="fu">=</span> h <span class="fu">+</span> mySum t
+
+mySquareAddTwo <span class="fu">=</span> mySum <span class="fu">.</span> myMap  (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> myMap (<span class="fu">*</span><span class="dv">2</span>) 
+
+<span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
+squareAddTwo <span class="fu">=</span> sum <span class="fu">.</span> map (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> map (<span class="fu">*</span><span class="dv">3</span>) 
+
+<span class="ot">myFoldingSquareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
+myFoldingSquareAddTwo <span class="fu">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="fu">+</span> (y<span class="fu">*</span><span class="dv">3</span> <span class="fu">+</span> <span class="dv">2</span>)) <span class="dv">0</span>
+
+main <span class="fu">=</span> <span class="kw">do</span>
+  [n] <span class="ot">&lt;-</span> getArgs
+  print <span class="fu">$</span> squareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]
+  print <span class="fu">$</span> myFoldingSquareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]        
+  print <span class="fu">$</span> mySquareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]  </code></pre>
+<h3 id="automatic-parallelism">Automatic parallelism</h3>
+<p>Repa provides a set of combinators for creating and manipulating arrays. The operations needed to build an array are described declaratively in a first step (creating a so-called <em>delayed</em> array), and then the array is later materialized (which will give an <em>unboxed</em> array).</p>
+<p>This double process allows for <code>repa</code> not only to fuse away the intermediate structures, but also to perform the required data dependency analysis prior to parallelizing the computation.</p>
+<p>Hopefully, the Voronoi example will help you understand this process.</p>
+<h2 id="voronoi">Voronoi</h2>
+<p>Quoting from the <a href="http://en.wikipedia.org/wiki/Voronoi_diagram">wikipedia</a>:</p>
+<blockquote>
+<p>In mathematics, a Voronoi diagram is a way of dividing space into a number of regions. A set of points (called seeds, sites, or generators) is specified beforehand and for each seed there will be a corresponding region consisting of all points closer to that seed than to any other. The regions are called Voronoi cells</p>
+</blockquote>
+<p>So we are trying to get a pretty picture like this one:</p>
+<div class="figure">
+<img src="/images/voronoi.png" title="Voronoi diagram" alt="Voronoi diagram" /><p class="caption">Voronoi diagram</p>
+</div>
+<p>It is a 512x512 images with 150 random centers. The colored polygons represent the areas which are closest to a particular center. The most popular algorithm for computing a Voronoi diagram in 2 dimensions seems to be <a href="http://en.wikipedia.org/wiki/Fortune&#39;s_algorithm">Fortune’s algorithm</a>. There are also nice open-source implementations out there: for real work, I’d recommend the excellent <a href="http://www.qhull.org/html/qvoronoi.htm">qhull library</a>.</p>
+<p>Since I was just interested in testing parallelism, I decided to implement it the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> way, which boils down to just applying the definition: take an image and a random set of in-range pixel coordinates (the centers). For each pixel, color it according to the center that lies closest (in our case, closest according to the euclidean metric). This algorithm is embarassingly naive, but also <a href="http://en.wikipedia.org/wiki/Embarrassingly_parallel">embarassingly parallel</a>, since each pixel can be computed independently.</p>
+<h2 id="the-source">The Source</h2>
+<p>The code is pretty straightforward. You can find the whole source <a href="https://raw.github.com/jarnaldich/jarnaldich.github.com/master/_src/posts/voronoi.hs">here</a>, or on the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> page.</p>
+<p>I’ll comment on the most important parts.</p>
+<p>First, we need a function for the metric to minimize. To make it faster, we will not take the square root. We will also use strict annotations and 32 bit unsigned integers (<code>Word32</code>), instead of Haskell’s unbounded <code>Int</code>s. Finally, we will tell GHC to inline it, since <code>Repa</code> recommends making extensive use of inlining (as always, when in doubt, profile).</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">{-# INLINE sqDistance #-}</span>    
+<span class="ot">sqDistance ::</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span>
+sqDistance <span class="fu">!</span>x1 <span class="fu">!</span>y1 <span class="fu">!</span>x2 <span class="fu">!</span>y2 <span class="fu">=</span> ((x1<span class="fu">-</span>x2)<span class="fu">^</span><span class="dv">2</span>) <span class="fu">+</span> ((y1<span class="fu">-</span>y2)<span class="fu">^</span><span class="dv">2</span>)</code></pre>
+<p>Getting a random array with the centers is easy and shows the way to generate unboxed arrays from a list in <code>repa</code>:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">centers ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM2</span> <span class="dt">Word32</span>
+centers nCenters nCells <span class="fu">=</span>
+      fromListUnboxed (<span class="dt">Z</span> <span class="fu">:.</span> nCenters <span class="fu">:.</span> <span class="dv">2</span>)
+    <span class="fu">$</span> take (<span class="dv">2</span><span class="fu">*</span>nCenters)
+    <span class="fu">$</span> randomRs (<span class="dv">0</span>, fromIntegral (nCells <span class="fu">-</span> <span class="dv">1</span>)) (mkStdGen <span class="dv">1</span>)</code></pre>
+<p>Note the type signature: <code>Array U DIM2 Word32</code> means unboxed array (the <code>U</code>), indexed by 2 integers (the <code>DIM2</code>) and storing <code>Word32</code> values. The indexing is a bit tricky, since is mostly done with the <code>:.</code> operator, and the notation is somewhat overloaded to denote indexes and shapes, so <code>arr Repa.! (Z:. i :. j)</code> means the element in the ith row and jth column of the array arr, but <code>fromListUnboxed (Z :. nCenters :. 2)</code> means we are creating an array of <code>nCenters</code> rows and 2 columns.</p>
+<p>Now there come two helper functions. The first one takes a 2 column matrix and a two parameter function and returns the array resulting of applying the function to each row.</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">applyReduce2 arr f <span class="fu">=</span> 
+    traverse arr (\(i <span class="fu">:.</span> j) <span class="ot">-&gt;</span> i) <span class="fu">$</span> \lookup (<span class="dt">Z</span><span class="fu">:.</span>i) <span class="ot">-&gt;</span>
+        f (lookup (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span><span class="dv">0</span>)) (lookup (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span><span class="dv">1</span>))</code></pre>
+<p>In order to do so, this function makes use of a very powerful <code>repa</code> combinator, which takes a function on the indices (in this case, reduces one dimension) and a two parameter function. The first parameter is itself a lookup function on the input array, while the second one is the index of the output array whose value we are trying to compute. Please refer to the <a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial">tutorial</a> if this is not clear enough.</p>
+<p>Apart from <code>traverse</code>, there are more familiar combinators, like <code>foldS</code>, which is just like a fold for arrays. We make use of it to compute the minimum of a function over an array. The final <code>S</code> stands for “sequential”. Some repa combinators come in two flavors: sequential ones or parallel ones (would be <code>foldP</code>). For this algorithm we will parallelize only the pixel loop, so we are using the sequential version for the minimization loop. Here’s the minimization function, which basically decorates the array with an index before folding over it:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">minimize1D arr <span class="fu">=</span> foldS f h t
+  <span class="kw">where</span>
+    indexer src idx<span class="fu">@</span>(<span class="dt">Z</span> <span class="fu">:.</span> i) <span class="fu">=</span> (src idx, (fromIntegral i))
+    indexed arr <span class="fu">=</span> traverse arr id indexer
+    (<span class="dt">Z</span> <span class="fu">:.</span> n) <span class="fu">=</span> extent arr
+    iarr <span class="fu">=</span> indexed arr
+    h <span class="fu">=</span> iarr <span class="fu">!</span> (<span class="dt">Z</span> <span class="fu">:.</span> <span class="dv">0</span>)
+    t <span class="fu">=</span> extract (<span class="dt">Z</span> <span class="fu">:.</span> <span class="dv">1</span>) (<span class="dt">Z</span> <span class="fu">:.</span> (n<span class="fu">-</span><span class="dv">1</span>)) iarr
+    f min<span class="fu">@</span>(<span class="fu">!</span>valMin, <span class="fu">!</span>iMin ) x<span class="fu">@</span>(<span class="fu">!</span>val, <span class="fu">!</span>i) <span class="fu">|</span> val <span class="fu">&lt;</span> valMin <span class="fu">=</span> x
+                                         <span class="fu">|</span> otherwise <span class="fu">=</span> min</code></pre>
+<p>With these helpers, writing a parallel voronoi is easy. We will make use of <code>fromFunction</code> to create a <em>delayed</em> array, which we can later force to compute.</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">voronoi ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">D</span> <span class="dt">DIM2</span> <span class="dt">Word32</span>
+voronoi nCenters nCells <span class="fu">=</span>
+    <span class="kw">let</span>
+      cellReducer <span class="fu">=</span> applyReduce2 (centers nCenters nCells)
+      nearestCenterIndex <span class="fu">=</span> snd <span class="fu">.</span> (<span class="fu">Repa.!</span> <span class="dt">Z</span>) <span class="fu">.</span> minimize1D
+      <span class="ot">{-# INLINE builder #-}</span>
+      builder (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span>j) <span class="fu">=</span> nearestCenterIndex
+                        <span class="fu">$</span> cellReducer <span class="fu">$</span> on sqDistance fromIntegral i j
+    <span class="kw">in</span>        
+      Repa.fromFunction (<span class="dt">Z</span> <span class="fu">:.</span> nCells <span class="fu">:.</span><span class="ot"> nCells ::</span> <span class="dt">DIM2</span>) builder</code></pre>
+<p>The <code>voronoi</code> function creates a matrix of integer indices, referring to the center which is closest. If we want to write that as an RGB image, we will also need a function to create a random color table and another one to colorize the voronoi array:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">genColorTable ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM1</span> (<span class="dt">Word8</span>, <span class="dt">Word8</span>, <span class="dt">Word8</span>)
+genColorTable n <span class="fu">=</span> fromListUnboxed (<span class="dt">Z</span> <span class="fu">:.</span> n) <span class="fu">$</span> zip3 l1 l2 l3
+    <span class="kw">where</span>
+      randoms <span class="fu">=</span> randomRs (<span class="dv">0</span>,<span class="dv">255</span>) (mkStdGen <span class="dv">1</span>)
+      (l1, rest1) <span class="fu">=</span> splitAt n randoms
+      (l2, rest2) <span class="fu">=</span> splitAt n rest1
+      l3 <span class="fu">=</span> take n rest2
+
+colorize ctable <span class="fu">=</span> Repa.map <span class="fu">$</span> \x <span class="ot">-&gt;</span> ctable <span class="fu">Repa.!</span> (<span class="dt">Z</span><span class="fu">:.</span> fromIntegral x)</code></pre>
+<p>As we can see, the colorized table will be a two dimensional array of 3-element tuples: one for the red, green, and blue components. This is the format expected by <code>writeImageToBMP</code> in the <code>Repa.IO.BMP</code> package.</p>
+<p>with all the above, the main function will look like:</p>
+<pre class="sourceCode haskell"><code class="sourceCode haskell">main <span class="fu">=</span> <span class="kw">do</span>
+  <span class="kw">let</span> nsites <span class="fu">=</span> <span class="dv">150</span>
+  <span class="kw">let</span> ctable <span class="fu">=</span> genColorTable nsites 
+  voro <span class="ot">&lt;-</span> computeP <span class="fu">$</span> colorize ctable <span class="fu">$</span> voronoi nsites <span class="dv">512</span>
+  writeImageToBMP <span class="st">&quot;out.bmp&quot;</span> voro</code></pre>
+<p>There are some cool things going on under the hood. First, note that we just plugged the <code>colorize</code> and <code>voronoi</code> parts. In spite of this, there will be no intermediate arrays: both calculations will be fused into a single operation.</p>
+<p>The second thing is the use of a parallel combinator <code>computeP</code>, which will transform a delayed array into an unboxed one <em>in parallel</em> (given the appropiate compilation options and runtime parameters). Note that parallel computations in repa must run in some monad, to ensure they are performed in the appropiate order. It can be any monad (in this case, it’s <code>main</code>’s <code>IO</code>).</p>
+<p>Now, if we compile with</p>
+<pre><code>ghc -O2 -fllvm -fforce-recomp -threaded --make voronoi.hs  -o voronoi</code></pre>
+<p>My machine is a somewhat oldish 2GHz Intel Core 2 Duo with 4GB (1067Mhz DDR3) of RAM. We can try to run it on one core:</p>
+<pre><code>$ time ./voronoi
+
+real	0m3.015s
+user	0m2.946s
+sys	0m0.069s</code></pre>
+<p>or on two cores:</p>
+<pre><code>$time ./voronoi +RTS -N2
+
+real	0m1.644s
+user	0m3.101s
+sys	0m0.068s</code></pre>
+<p>Note that the speedup is pretty good. We can also see detailed statistics by the runtime system:</p>
+<pre><code>$ ./voronoi +RTS -N2 -s
+   8,750,790,680 bytes allocated in the heap
+       5,940,344 bytes copied during GC
+         852,168 bytes maximum residency (2 sample(s))
+          49,752 bytes maximum slop
+               5 MB total memory in use (2 MB lost due to fragmentation)
+
+                                  Tot time (elapsed)  Avg pause  Max pause
+Gen  0      8640 colls,  8639 par    0.15s    0.11s     0.0000s    0.0033s
+Gen  1         2 colls,     2 par    0.00s    0.00s     0.0003s    0.0005s
+
+  Parallel GC work balance: 1.78 (690765 / 388167, ideal 2)
+
+                        MUT time (elapsed)       GC time  (elapsed)
+  Task  0 (worker) :    3.00s    (  1.57s)       0.18s    (  0.13s)
+  Task  1 (worker) :    3.18s    (  1.69s)       0.00s    (  0.00s)
+  Task  2 (bound)  :    3.18s    (  1.69s)       0.00s    (  0.00s)
+  Task  3 (worker) :    2.97s    (  1.54s)       0.21s    (  0.15s)
+
+  SPARKS: 0 (0 converted, 0 overflowed, 0 dud, 0 GC&#39;d, 0 fizzled)
+
+  INIT    time    0.00s  (  0.00s elapsed)
+  MUT     time    3.03s  (  1.59s elapsed)
+  GC      time    0.15s  (  0.11s elapsed)
+  EXIT    time    0.00s  (  0.00s elapsed)
+  Total   time    3.18s  (  1.69s elapsed)
+
+  Alloc rate    2,884,832,617 bytes per MUT second
+
+  Productivity  95.3% of total user, 179.1% of total elapsed
+
+gc_alloc_block_sync: 3416
+whitehole_spin: 0
+gen[0].sync: 0
+gen[1].sync: 3</code></pre>
+<p>95% user productivity looks good to me. By comparison, and unoptimized single-core <code>C</code> version out of <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> takes somewhat less than 2 seconds, while the optimized one takes around half a second.</p>
+<p>Please, take the times above with a grain of salt: I am sure a seasoned haskeller would squeeze more speed out of my version, and probably the <code>C</code> and the Haskell should’nt be compared in the first place (the output image format is different).</p>
+<h2 id="conclusions">Conclusions</h2>
+<p>As we have seen, writing parallel array operations with a decent performance is easy with <code>Repa</code>. While I am doubtful that it can reach the speed of <code>C</code> without making the code just too ugly, IMHO the balance between speed, ease of development and compositional style makes <code>Repa</code> a worthwhile tool in your bag.</p>
+<h2 id="references">References</h2>
+<p>Here are some cool links if you want to play around with Voronoi diagrams:</p>
+<ul>
+<li><a href="http://bl.ocks.org/mbostock/4060366">Online demo</a></li>
+<li><a href="http://www.raymondhill.net/voronoi/rhill-voronoi.html">Another one</a></li>
+<li><a href="http://www.senchalabs.org/philogl/PhiloGL/examples/voronoi/">A spherical one</a></li>
+<li><a href="http://voronoi.com/wiki/index.php?title=Main_Page">The vorowiki</a></li>
+</ul>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/haskell.html">haskell</a>, <a href="/tags/voronoi.html">voronoi</a>, <a href="/tags/repa.html">repa</a>, <a href="/tags/parallel.html">parallel</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+
+                </div>
+            </div>
+        </div>
+
+        <script>
+          (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+                  ga('create', 'UA-6838480-2', 'jarnaldich.me');
+                    ga('send', 'pageview');
+
+        </script>
+    </body>
+</html>
