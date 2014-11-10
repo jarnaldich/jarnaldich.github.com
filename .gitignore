@@ -3,5 +3,6 @@ _cache
 .cabal-sandbox
 cabal.sandbox.config
 dist/
+build/
 \#*\#
 .DS_Store
