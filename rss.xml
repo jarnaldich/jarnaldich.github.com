@@ -216,7 +216,7 @@ gen[1].sync: 3</code></pre>
 
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
-  
+<div id="disqus_thread"></div>  
 <script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
@@ -227,6 +227,8 @@ gen[1].sync: 3</code></pre>
           (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
       })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
 ]]></description>
     <pubDate>Sat, 14 Dec 2013 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html</guid>
@@ -301,7 +303,7 @@ myFuncExpectingDataText <span class="st">&quot;Hello World!&quot;</span></code><
 
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
-  
+<div id="disqus_thread"></div>  
 <script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
@@ -312,6 +314,8 @@ myFuncExpectingDataText <span class="st">&quot;Hello World!&quot;</span></code><
           (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
       })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
 ]]></description>
     <pubDate>Mon, 09 Sep 2013 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2013/09/08/haskell-gotchas-strings.html</guid>
@@ -396,7 +400,7 @@ IN: scratchpad </code></pre>
 
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
-  
+<div id="disqus_thread"></div>  
 <script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
@@ -407,6 +411,8 @@ IN: scratchpad </code></pre>
           (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
       })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
 ]]></description>
     <pubDate>Sun, 24 Feb 2013 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2013/02/24/raw-strings-in-factor.html</guid>
@@ -571,7 +577,7 @@ IN: scratchpad </code></pre>
 
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
-  
+<div id="disqus_thread"></div>  
 <script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
@@ -582,6 +588,8 @@ IN: scratchpad </code></pre>
           (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
       })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
 ]]></description>
     <pubDate>Sun, 07 Aug 2011 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2011/08/07/raw-strings-in-racket.html</guid>
@@ -630,7 +638,7 @@ IN: scratchpad </code></pre>
 
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
-  
+<div id="disqus_thread"></div>  
 <script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
@@ -641,6 +649,8 @@ IN: scratchpad </code></pre>
           (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
       })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
 ]]></description>
     <pubDate>Wed, 13 Jul 2011 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2011/07/13/cygrunsrv.html</guid>
@@ -713,7 +723,7 @@ IN: scratchpad </code></pre>
 
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
-  
+<div id="disqus_thread"></div>  
 <script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
@@ -724,6 +734,8 @@ IN: scratchpad </code></pre>
           (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
       })();
 </script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
 ]]></description>
     <pubDate>Fri, 01 Jul 2011 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2011/07/01/first-post.html</guid>
