@@ -4,7 +4,7 @@ Like many other languages, Common Lisp has its own equivalent of a package  mana
 
 Here is a list of systems I use so often I feel they are part of my "custom" Common Lisp. In non-Lisp lingo, I don´t think of them as "libraries", but rather as core language features: it just happens to be my own  _Cozy Common Lisp_.
 
-## Iterate
+## iterate
 Let's face it: the loop macro is ugly. It is very powerful, but it is not very intuitive and it embeds a non-lispy DSL that most editors have a hard time at formatting. It has a lot of corner cases and keywords and it´s easy to abuse.
 
 Just compare the examles from Iterate's home page. We are trying to find the longes list in a list of lists. The loop version:
@@ -27,7 +27,7 @@ The iterate version:
 
 Furthermore, Iterate is designed to be [extensible](http://common-lisp.net/project/iterate/doc/Rolling-Your-Own.html#Rolling-Your-Own) from the beginning.
 
-# metabang-bind
+## metabang-bind
 Common Lisp has many binding constructs. If you need to combine more than one in the same piece of code you can end up with a lot of spurious indentation levels. For example, if you need to use a locally-defined function, destructure a list and retrieve the result of a multiple-value returning function, you would do:
 
 ```lisp
@@ -51,9 +51,25 @@ I certainly prefer the latter (I can understand people prefering the former, tho
 
 The bind macro also lets you destructure objects, tructs, bind the result of regular expressions and other goodies. And again, it is extensible. Check the [manual](http://common-lisp.net/project/metabang-bind/user-guide.html).
 
+## cl-anonfun
+Although, in general, I have the feeling that Common Lisp leans more on the imperative side than other more functional cousins (scheme, racket, certainly clojure), it is still embraces the functional paradigm very nicely.
 
-metabang-bind
-cl-anonfun
+One of the things you will probably miss when you code "functionally" is a nicer syntax for anonymous functions. The fact that Common Lisp is a Lisp-2 does not help, either. So, for example, the functional way to multiply the elements of two lists in parallel in CL would be:
+
+```lisp
+(mapcar #'(lambda (x y) (* x y)) '(3 4) '(2 3))
+```
+[cl-anonfun](https://github.com/arielnetworks/cl-anonfun) defines a macro and a way to index parameters that would let you write:
+
+```lisp
+(mapcar (fn (* %1 %2)) '(3 4) '(2 3))
+```
+Or, when enabling the reader macro:
+```lisp
+(mapcar #%(* %1 %2) '(3 4) '(2 3))
+```
+Which I find less clutered. There are other packages with a similar functionality on Quicklisp, I just found this one to work for me.
+
 
 cl-fad
 alexandria
