@@ -4,6 +4,8 @@ Like many other languages, Common Lisp has its own equivalent of a package  mana
 
 Here is a list of systems I use so often I feel they are part of my "custom" Common Lisp. Of course, the choiced just reflects my personal preferences. I will restrict the list to those packages that provide "syntactic" constructs, leaving what we could call the "library" (alexandria, cl-fad, etc...) for another post.
 
+Also, I am willing to expand this list, so if you know any worthy package I´ve been missing, please leave a comment!
+
 ## iterate
 Let's face it: the loop macro is ugly. It is very powerful, but not very intuitive and it embeds a non-lispy DSL that most editors have a hard time at formatting. It has a lot of corner cases and keywords and it´s easy to abuse.
 
@@ -70,8 +72,3 @@ Or, when enabling the reader macro:
 ```
 Which I find less clutered. There are other packages with a similar functionality on Quicklisp, I just found this one to work for me.
 
-
-cl-fad
-alexandria
-
-(asdf-install? quicklisp?)
