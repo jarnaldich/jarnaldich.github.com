@@ -27,6 +27,31 @@ The iterate version:
 
 Furthermore, Iterate is designed to be [extensible](http://common-lisp.net/project/iterate/doc/Rolling-Your-Own.html#Rolling-Your-Own) from the beginning.
 
+# metabang-bind
+Common Lisp has many binding constructs. If you need to combine more than one in the same piece of code you can end up with a lot of spurious indentation levels. For example, if you need to use a locally-defined function, destructure a list and retrieve the result of a multiple-value returning function, you would do:
+
+```lisp
+(destructuring-bind (a b) '(1 2)
+  (multiple-value-bind (c d) (values 3 4)
+    (flet ((plus-one (x) (1+ x)))
+      (let ((l (list a b c d)))
+        (mapcar #'plus-one l)))))
+```
+
+The package [metabang-bind](http://common-lisp.net/project/metabang-bind/user-guide.html) was designed to solve that problem. It offers a single construct and a well-designed syntax that will let you write the above example as:
+
+```lisp
+(bind (((a b) '(1 2))
+       ((:values c d) (values 3 4))
+       ((:flet plus-one (x)) (1+ x))
+       (l (list a b c d)))
+  (mapcar #'plus-one l))
+```
+I certainly prefer the latter (I can understand people prefering the former, though, since it makes the scope of every definition explicit).
+
+The bind macro also lets you destructure objects, tructs, bind the result of regular expressions and other goodies. And again, it is extensible. Check the [manual](http://common-lisp.net/project/metabang-bind/user-guide.html).
+
+
 metabang-bind
 cl-anonfun
 
