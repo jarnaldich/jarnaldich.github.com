@@ -14,7 +14,7 @@ test:
     - git submodule init
     - git submodule update
     - cd _site/ && git checkout master
-    - .stack-work/install/x86_64-linux/lts-2.22/7.8.4/bin/site rebuild
+    - .stack-work/install/x86_64-linux/lts-2.22/7.8.4/bin/site build
 
 deployment:
   production:
