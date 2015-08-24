@@ -96,7 +96,8 @@ main <span class="fu">=</span> <span class="kw">do</span>
 </blockquote>
 <p>So we are trying to get a pretty picture like this one:</p>
 <div class="figure">
-<img src="/images/voronoi.png" title="Voronoi diagram" alt="Voronoi diagram" /><p class="caption">Voronoi diagram</p>
+<img src="/images/voronoi.png" title="Voronoi diagram" alt="Voronoi diagram" />
+<p class="caption">Voronoi diagram</p>
 </div>
 <p>It is a 512x512 images with 150 random centers. The colored polygons represent the areas which are closest to a particular center. The most popular algorithm for computing a Voronoi diagram in 2 dimensions seems to be <a href="http://en.wikipedia.org/wiki/Fortune&#39;s_algorithm">Fortune’s algorithm</a>. There are also nice open-source implementations out there: for real work, I’d recommend the excellent <a href="http://www.qhull.org/html/qvoronoi.htm">qhull library</a>.</p>
 <p>Since I was just interested in testing parallelism, I decided to implement it the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> way, which boils down to just applying the definition: take an image and a random set of in-range pixel coordinates (the centers). For each pixel, color it according to the center that lies closest (in our case, closest according to the euclidean metric). This algorithm is embarassingly naive, but also <a href="http://en.wikipedia.org/wiki/Embarrassingly_parallel">embarassingly parallel</a>, since each pixel can be computed independently.</p>
