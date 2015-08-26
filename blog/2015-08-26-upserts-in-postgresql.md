@@ -1,5 +1,9 @@
+---
+title: Upserts in PosgreSQL
+date: 2015-08-26T00:00:00
+tags: sql, postgresql, upsert
+---
 
-# Upserts in Postgresql
 Note: most of the content of this article is already in [this blog post](http://www.depesz.com/2012/06/10/why-is-upsert-so-complicated/), which is far more detailed. I'm just writing this for people who want to get directly to the solution and do not care for Perl code.
 
 ## What is it?
@@ -13,11 +17,11 @@ Like when:
 
 ## Ok. How can I do this?
 
-Well, first thing is to check your PostGreSQL version. Versions 9.5 will have this functionality built-in (as many other RDBMS do) through the use of the `INSERT ... ON CONFLICT` clause. See the [discussion](https://wiki.postgresql.org/wiki/UPSERT).
+Well, first thing is to check your PostgreSQL version. Versions 9.5 will have this functionality built-in (as many other RDBMS do) through the use of the `INSERT ... ON CONFLICT` clause. See the [discussion](https://wiki.postgresql.org/wiki/UPSERT).
 
 At the time of writing this, 9.5 is not available, and anyway many of us are forced to work with legacy versions, so here I will discuss a couple of ways to achive this functionality. Notice that geting this right is not easy, since concurrency and transaction issues must be taken into account. In particular, doing this in your code:
 
-```
+```sql
 if (SELECT whatever to check if record exists)
     UPDATE it
 else 
@@ -26,9 +30,9 @@ else
 
 or alternatively,
 
-```
+```sql
 if(UPDATE affects one or more records) 
-  // we're done
+  -- we're done
 else 
   INSERT record;
 ```
@@ -39,7 +43,7 @@ Will not work even inside a transaction. The default isolation level for transac
 
 So if you want a general solution that works for all of the 3 cases stated previously, you should probably write a stored procedure in the DB like the [documentation suggests](http://www.postgresql.org/docs/current/static/plpgsql-control-structures.html#PLPGSQL-UPSERT-EXAMPLE):
 
-```
+```sql
 CREATE TABLE db (a INT PRIMARY KEY, b TEXT);
 
 CREATE FUNCTION merge_db(key INT, data TEXT) RETURNS VOID AS
@@ -81,7 +85,7 @@ This solution has the advantage of delegating db-specific code into the DB and s
 
 If you know in advance that your process will not run concurrently, then all of the above can be greatly simplified. For example, if just want to make sure that a record exists in the db (and not fail with a duplicate key entry the second time), a combination of an INSERT and a SELECT will work, making use of the fact that INSERTS will accept a sub-SELECT instead of a VALUES clause:
 
-```
+```sql
 INSERT INTO TEST (whatever, counter)
     SELECT 123, 1 WHERE NOT EXISTS (SELECT * FROM test WHERE whatever = 123);
 ```
