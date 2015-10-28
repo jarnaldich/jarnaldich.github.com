@@ -11,6 +11,8 @@ To activate the python layer, you just need to add a `python` entry into the `do
 
 After doing so, the configuration can be reloaded with `SPC f e R`.
 
+The configuration for the python layer is under the `~/.emacs.d/layers/+lang/python/` directory. Make sure you read the README.org file there, and it may also be instructive to check the `packages.el` if something does not work out of the box.
+
 ## Tweak projectile
 
 Minor configurations should be placed inside the `dotspacemacs/config` function in `.spacemacs`. Spacemacs comes with [Projectile](http://batsov.com/projectile/), an emacs mode for project-wide configurations. 
@@ -31,7 +33,7 @@ So you should try to make sure that Projectile and you agree on the kind of proj
 Also notice that the rest of arguments will be the defaults for building a project and making tests, in case you need to tweak something.
 
 ### Toggle between test and implementation
-One of the things proectile can do is switching between the test and implementation. You may need to include a function to accomodate whatever convention you use for test files and add it to the `dotspacemacs/config` defun. In my case, I use a `test_` prefix in my test files.
+One of the things projectile can do is switching between the test and implementation. You may need to include a function to accomodate whatever convention you use for test files and add it to the `dotspacemacs/config` defun. In my case, I use a `test_` prefix in my test files.
 
 ```lisp
   (setq projectile-test-prefix-function
@@ -47,6 +49,11 @@ After reloading, `SPC p a` should toggle between test and implementation. `C-c p
 python -m unittest discover -p "test_*.py"
 ```
 
+## Anaconda mode
+
+
+
 ## See also
 - Read more about spacemacs tweaking in general [here](http://thume.ca/howto/2015/03/07/configuring-spacemacs-a-tutorial/)
 - [This page](https://touk.pl/blog/2015/10/14/getting-started-with-haskell-stack-and-spacemacs/) will help Haskell / Stack users set up spacemacs.
+- For general info on Python programming in vanilla emacs, check the [wiki](http://emacswiki.org/emacs/PythonProgrammingInEmacs).
