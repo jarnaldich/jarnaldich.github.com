@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <title>Joan Arnaldich - Cozy Common Lisp</title>
+
+        <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
+
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
+
+        <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+    </head>
+    <body>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <div class="page-header">
+                        <h1>Joan
+                        Arnaldich<sup class="sup-title">(.me)</sup></h1>
+
+                        <div style="margin-top:20px;">
+                            <div class="row">
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <h1>Cozy Common Lisp</h1>
+
+<small>Posted on January  1, 2000 <a href="/drafts/my-favorite-quickloadable-systems.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<h1 id="joans-cozy-common-lisp">Joan’s Cozy Common Lisp</h1>
+<p>Like many other languages, Common Lisp has its own equivalent of a package manager called <a href="http://quicklisp.org">Quicklisp</a> available. But, unlike in most other languages, it is not only <em>libraries</em> that you can download and install. Honoring its <em>programmable programming language</em> nature, QuickLisp lets you download and install <em>systems</em> that can affect the developer’s programming experience in a way only Lisps can do: you can extend syntax constructs with (reader-)macros, up to define whole new DSLs for specific tasks. Having such a mechanism is even more important in Common Lisp than in other Lisps: as many parts of Common Lisp get “frozen” by the ISO standard, coders started to fill the gaps needed for modern, real-world programming through user-level systems they can now share on QuickLisp.</p>
+<p>Here is a list of systems I use so often I feel they are part of my “custom” Common Lisp. Of course, the choiced just reflects my personal preferences. I will restrict the list to those packages that provide “syntactic” constructs, leaving what we could call the “library” (alexandria, cl-fad, etc…) for another post.</p>
+<p>Also, I am willing to expand this list, so if you know any worthy package I’ve been missing, please leave a comment!</p>
+<h2 id="iterate">iterate</h2>
+<p>Let’s face it: the loop macro is ugly. It is very powerful, but not very intuitive and it embeds a non-lispy DSL that most editors have a hard time at formatting. It has a lot of corner cases and keywords and it’s easy to abuse.</p>
+<p>Just compare the examles from Iterate’s home page. We are trying to find the longes list in a list of lists. The loop version:</p>
+<pre class="lisp"><code>(loop with max-elt = nil
+      with max-key = 0
+      for elt in list-of-lists
+      for key = (length elt) do
+      (when (&gt; key max-key)
+        (setq max-elt elt
+              max-key key))
+      finally (return max-elt))
+</code></pre>
+<p>The iterate version:</p>
+<pre class="lisp"><code>(iterate (for elt in list-of-lists)
+         (finding elt maximizing (length elt)))</code></pre>
+<p>Furthermore, Iterate is designed to be <a href="http://common-lisp.net/project/iterate/doc/Rolling-Your-Own.html#Rolling-Your-Own">extensible</a> from the beginning.</p>
+<h2 id="metabang-bind">metabang-bind</h2>
+<p>Common Lisp has many binding constructs. If you need to combine more than one in the same piece of code you can end up with a lot of spurious indentation levels. For example, if you need to use a locally-defined function, destructure a list and retrieve the result of a multiple-value returning function, you would do:</p>
+<pre class="lisp"><code>(destructuring-bind (a b) &#39;(1 2)
+  (multiple-value-bind (c d) (values 3 4)
+    (flet ((plus-one (x) (1+ x)))
+      (let ((l (list a b c d)))
+        (mapcar #&#39;plus-one l)))))</code></pre>
+<p>The package <a href="http://common-lisp.net/project/metabang-bind/user-guide.html">metabang-bind</a> was designed to solve that problem. It offers a single construct and a well-designed syntax that will let you write the above example as:</p>
+<pre class="lisp"><code>(bind (((a b) &#39;(1 2))
+       ((:values c d) (values 3 4))
+       ((:flet plus-one (x)) (1+ x))
+       (l (list a b c d)))
+  (mapcar #&#39;plus-one l))</code></pre>
+<p>I certainly prefer the latter (I can understand people prefering the former, though, since it makes the scope of every definition explicit).</p>
+<p>The bind macro also lets you destructure objects, tructs, bind the result of regular expressions and other goodies. And again, it is extensible. Check the <a href="http://common-lisp.net/project/metabang-bind/user-guide.html">manual</a>.</p>
+<h2 id="cl-anonfun">cl-anonfun</h2>
+<p>Although, in general, I have the feeling that Common Lisp leans more on the imperative side than other more functional cousins (scheme, racket, certainly clojure), it is still embraces the functional paradigm very nicely.</p>
+<p>One of the things you will probably miss when you code “functionally” is a nicer syntax for anonymous functions. The fact that Common Lisp is a Lisp-2 does not help, either. So, for example, the functional way to multiply the elements of two lists in parallel in CL would be:</p>
+<pre class="lisp"><code>(mapcar #&#39;(lambda (x y) (* x y)) &#39;(3 4) &#39;(2 3))</code></pre>
+<p><a href="https://github.com/arielnetworks/cl-anonfun">cl-anonfun</a> defines a macro and a way to index parameters that would let you write:</p>
+<pre class="lisp"><code>(mapcar (fn (* %1 %2)) &#39;(3 4) &#39;(2 3))</code></pre>
+<p>Or, when enabling the reader macro:</p>
+<pre class="lisp"><code>(mapcar #%(* %1 %2) &#39;(3 4) &#39;(2 3))</code></pre>
+<p>Which I find less clutered. There are other packages with a similar functionality on Quicklisp, I just found this one to work for me.</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/lisp.html">lisp</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/drafts/my-favorite-quickloadable-systems.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+
+                </div>
+            </div>
+        </div>
+
+        <script>
+          (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+                  ga('create', 'UA-6838480-2', 'jarnaldich.me');
+                    ga('send', 'pageview');
+
+        </script>
+    </body>
+</html>
