@@ -1,3 +1,9 @@
+---
+title: Javascript
+date: 2000-01-01T00:00:00
+tags: javascript
+---
+
 # On JavaScript #
 
 I remember playing around with JavaScript back in the times of

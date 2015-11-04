@@ -3,8 +3,12 @@
 import Control.Applicative ((<$>))
 import Data.Monoid
 import qualified Data.Set as Set
+import System.Directory (getModificationTime)
+import Data.Time.Clock
+import Data.Time.Format
 import Text.Pandoc.Options
 import Hakyll
+import System.Locale
 
 main :: IO ()
 main = hakyll $ do
@@ -38,6 +42,15 @@ main = hakyll $ do
             >>= saveSnapshot "content"
             >>= loadAndApplyTemplate "templates/default.html" postCtx
 --            >>= relativizeUrls
+
+    match "drafts/*" $ do
+        route $ (customRoute draftRoute) `composeRoutes` (setExtension "html")
+        compile $ pandocCompiler'
+            >>= loadAndApplyTemplate "templates/post.html" (taggedPostCtx tags)
+            >>= saveSnapshot "content"
+            >>= loadAndApplyTemplate "templates/default.html" postCtx
+--            >>= relativizeUrls
+
 
     create ["posts.html"] $ do
         route idRoute
@@ -156,4 +169,15 @@ dateSubdirRoute x =
     (day,   '-' : title) =  break (== '-') aux2
   in
    year ++ "/" ++ month ++ "/" ++ day  ++ "/" ++ title
-            
+
+modifTimeSubdirRoute :: Identifier -> IO FilePath
+modifTimeSubdirRoute x = do
+  let idAsFile = toFilePath x
+  t <- getModificationTime idAsFile
+  let year = formatTime defaultTimeLocale "%Y" t
+  let month = formatTime defaultTimeLocale "%m" t
+  let day = formatTime defaultTimeLocale "%d" t
+  let path = year ++ "/" ++ month ++ "/" ++ day  ++ "/" ++ idAsFile
+  return $ path
+
+draftRoute = toFilePath 

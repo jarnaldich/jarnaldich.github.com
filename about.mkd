@@ -13,4 +13,4 @@ My main interest areas in computing are non-imperative programming
 paradigms, distributed & parallel computing, image processing and
 geographic information systems. I also have a soft spot for some
 topics on applied maths (operations research, optimization,
-statistics, machine learning ...).
+statistics, machine learning).

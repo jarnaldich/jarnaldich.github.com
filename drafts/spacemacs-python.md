@@ -1,3 +1,10 @@
+---
+title: Setting up Spacemacs for Python
+date: 2000-01-01T00:00:00
+tags: spacemacs, python, emacs 
+---
+
+
 ## Setting Up Spacemacs for Python Development
 For those of you who do not know yet, [Spacemacs](https://github.com/syl20bnr/spacemacs) is an emacs configuration focused on ergonomics with EVIL mode (VI - like emulation) turned on by default.
 
