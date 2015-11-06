@@ -44,7 +44,24 @@
 <small>Posted on January  1, 2000 <a href="/drafts/data-frames-overview.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <h1 id="introduction">Introduction</h1>
-<p>One of the most successful abstractions for relational data processing is the <em>Dataframe</em>.</p>
+<p>In Software Engineering, there are rare occasions where an abstraction seems to fit a problem so well that it becomes <em>the</em> way to tackle it. One of the most successful abstractions for relational data processing is the <em>Dataframe</em>. Originally used in <code>S</code>, made its way into <a href="https://www.r-project.org/">R</a>, <a href="http://pandas.pydata.org/">pandas</a>, <a href="http://julia-lang.org">Julia</a> <a href="http://incanter.org">clojure</a>. I would like to write a series of blog-posts describing how to wrangle data with these different implementations, but before that it’s worth to take a minute to think about the abstraction itself. You can think of this article as a very informal, pragmatic description of relational algebra for the working programmer.</p>
+<h1 id="operations">Operations</h1>
+<p>The dataframe is so pervasive because it is just a convenient implementation of a <a href="https://en.wikipedia.org/wiki/Relational_algebra">relation</a>, as described by <a href="https://en.wikipedia.org/wiki/Edgar_F._Codd">Codd</a>.</p>
+<p>Most programmers will be more familiar with the <em>table abstraction</em> in a relational DB, which is also an implementation of the same principles. In fact, most programmers will find this definition useful: the dataframe is an object that allows the same kind of operations performed between SQL tables, but <em>inside your application</em>, in a convenient way. These operations are, loosely:</p>
+<ul>
+<li><p>The <em>projection</em> of attributes. That meas that, from a dataframe, we can generate another one that only contains the attributes we are interested in. In SQL, that is what you do when specifying the columns after a <code>SELECT</code>.</p></li>
+<li><p>The <em>selection</em> of rows based on some logical conditions. That is what you do when specifying a <code>WHERE</code> clause SQL.</p></li>
+<li><p><em>Merging</em> different dataframes based on some properties. These are the operations that people perform when using <code>JOIN</code>s in <code>SQL</code>. There are different kind of joins, which I will not discuss in detail now. The <a href="https://en.wikipedia.org/wiki/Relational_algebra">wikipedia</a> will be enough for my explanations.</p></li>
+<li><p><em>Aggregating</em> data can be further classified in sub-groups based on some logical criteria and some measures can be taken for each group. This is what you get through the <code>GROUP BY</code> and the aggregating functions (<code>COUNT</code>, <code>AVG</code>) in SQL.</p></li>
+</ul>
+<p>So, if everyting is down there in SQL and there are so many quality OS databases, why do we need those dataframe libraries at all? Well, here are some reasons:</p>
+<ul>
+<li><p>For problem domains where you care about <em>analysis</em> more than <em>curation</em>. That is the typical case for statistical packages such as <code>R</code>, where a statistician is concerned with describing or modelling the data more than actually making it available for querying or long-term cataloging.</p></li>
+<li><p>To combine data coming from different sources: a db, Excel files, CSV, XML, web scraping, etc…</p></li>
+<li><p>In a step where you do not yet know the structure of your data, so a DB schema cannot be properly described. Most dataframes allow for flexible typing, so these tools can be useful even as a tool to analyze the eventual schema of a relational DB.</p></li>
+<li><p>For one-shot analysis or attribute extractions, where the overhead of setting up a DB is not desireable.</p></li>
+<li><p>Dataframes are often implmented as some kind of library withing a language, so you get all the eventual goodies of the host. For example, in <code>R</code> you get all the analysis in the <a href="https://cran.r-project.org/">CRAN</a>. For Pandas, you get all the power of scientific python, etc…</p></li>
+</ul>
 
 <div class="panel panel-default">
     <div class="panel-body">
