@@ -10,11 +10,13 @@
               rel="stylesheet">
 
         <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
-
-        <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+       <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
         <link rel="stylesheet" type="text/css" href="/css/custom.css" />
     </head>
     <body>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
         <div class="container">
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -43,45 +45,53 @@
 
 <small>Posted on January  1, 2000 <a href="/drafts/incanter.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
-<p>This will be a file on using incanter for data processing # Incanter</p>
+<p>This will be a file on using incanter for data processing</p>
+<h1 id="incanter">Incanter</h1>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Title</th>
+<th align="left">Author</th>
+<th align="left">Language</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Jaques le fataliste et son mâitre</td>
+<td align="left">Dennis Diderot</td>
+<td align="left">French</td>
+</tr>
+<tr class="even">
+<td align="left"><em><strong>Gravity’s Rainbow</strong></em></td>
+<td align="left"><strong>Thomas Pynchon</strong></td>
+<td align="left"><strong>English</strong></td>
+</tr>
+<tr class="odd">
+<td align="left">The Life and Opinions of Tristram Shandy, Gentleman</td>
+<td align="left">Laurence Sterne</td>
+<td align="left">English</td>
+</tr>
+</tbody>
+</table>
+<h1 id="bowtie"><span class="math">\[\bowtie\]</span></h1>
+<p><span class="math">\[ f(x)=\sum_{n=0}^\infty\frac{f^{(n)}(a)}{n!}(x-a)^n \]</span></p>
 <h2 id="use">Use</h2>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">(<span class="kw">use</span> &#39;(incanter core stats charts io))</code></pre>
+<p>Holasss!</p>
 <h2 id="stock-datasets">Stock datasets</h2>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">(<span class="kw">def</span><span class="fu"> ds </span>(get-dataset <span class="kw">:iris</span>))</code></pre>
+<p>Holasss!</p>
 <h2 id="create-datasets">Create datasets</h2>
 <p>To define a dataset, the user must suply column names and data rows:</p>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">(<span class="kw">def</span><span class="fu"> ds </span>(dataset [<span class="kw">:a</span> <span class="kw">:b</span> <span class="kw">:c</span>]
-                 [[<span class="dv">1</span> <span class="dv">2</span> <span class="dv">3</span>]
-                  [<span class="dv">4</span> <span class="dv">5</span> <span class="dv">6</span>]]))</code></pre>
+<p>Holasss!</p>
 <p>The <code>to-dataset</code> method lets you create a DS from different objects.</p>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">(<span class="kw">def</span><span class="fu"> from-map </span>(to-dataset [{<span class="kw">:a</span> <span class="dv">1</span>, <span class="kw">:b</span> <span class="dv">2</span>, <span class="kw">:c</span> <span class="dv">3</span>},
-                           {<span class="kw">:a</span> <span class="dv">4</span>, <span class="kw">:b</span> <span class="dv">5</span>, <span class="kw">:c</span> <span class="dv">6</span>}]))
-
-(<span class="kw">def</span><span class="fu"> from-mat </span>(to-dataset [[<span class="dv">1</span> <span class="dv">2</span> <span class="dv">3</span>] [<span class="dv">4</span> <span class="dv">5</span> <span class="dv">6</span>]]))</code></pre>
+<p>Holasss!</p>
 <h2 id="inspect">Inspect</h2>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">(view ds)</code></pre>
+<p>Holasss!</p>
 <h2 id="save-as-csv">Save as CSV</h2>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">(save ds)</code></pre>
+<p>Holasss!</p>
 <h2 id="select-a-whole-column">Select a whole column</h2>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">($ <span class="kw">:Species</span> iris)</code></pre>
+<p>Holasss!</p>
 <h2 id="select-rows">Select rows</h2>
-<pre class="sourceCode clojure"><code class="sourceCode clojure">($where {<span class="st">&quot;Species&quot;</span> <span class="st">&quot;setosa&quot;</span>}
- (get-dataset <span class="kw">:iris</span>))
-
-($where {<span class="st">&quot;Petal.Width&quot;</span> {<span class="kw">:lt</span> <span class="fl">1.5</span>}}
- (get-dataset <span class="kw">:iris</span>))
-
-($where {<span class="st">&quot;Petal.Width&quot;</span> {<span class="kw">:gt</span> <span class="fl">1.0</span>, <span class="kw">:lt</span> <span class="fl">1.5</span>}}
- (get-dataset <span class="kw">:iris</span>))
-
-($where {<span class="st">&quot;Petal.Width&quot;</span> {<span class="kw">:gt</span> <span class="fl">1.0</span>, <span class="kw">:lt</span> <span class="fl">1.5</span>}
- <span class="st">&quot;Species&quot;</span> {<span class="kw">:in</span> #{<span class="st">&quot;virginica&quot;</span> <span class="st">&quot;setosa&quot;</span>}}}
- (get-dataset <span class="kw">:iris</span>))
-
-($where (<span class="kw">fn</span> [row]
- (<span class="kw">or</span> (<span class="kw">&lt;</span> (row <span class="st">&quot;Petal.Width&quot;</span>) <span class="fl">1.0</span>)
- (<span class="kw">&gt;</span> (row <span class="st">&quot;Petal.Length&quot;</span>) <span class="fl">5.0</span>)))
- (get-dataset <span class="kw">:iris</span>))</code></pre>
+<p>Holasss!</p>
 
 <div class="panel panel-default">
     <div class="panel-body">
@@ -133,5 +143,7 @@
                     ga('send', 'pageview');
 
         </script>
+
+
     </body>
 </html>
