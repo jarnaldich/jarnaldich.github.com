@@ -5,9 +5,22 @@ tags: clojure, incanter, lisp, data
 ---
 
 This will be a file on using incanter for data processing 
+
+
+
 # Incanter
 
 
+| Title                                               | Author          | Language |
+|-----------------------------------------------------+-----------------+----------|
+| Jaques le fataliste et son mâitre                   | Dennis Diderot  | French   |
+|  _**Gravity's Rainbow**_                                   | **Thomas Pynchon**  | **English**  |
+| The Life and Opinions of Tristram Shandy, Gentleman | Laurence Sterne | English  |
+
+
+
+# $$\bowtie$$
+$$ f(x)=\sum_{n=0}^\infty\frac{f^{(n)}(a)}{n!}(x-a)^n $$
 
 ## Use
 

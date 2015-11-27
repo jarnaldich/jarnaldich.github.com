@@ -6,8 +6,11 @@ import qualified Data.Set as Set
 import System.Directory (getModificationTime)
 import Data.Time.Clock
 import Data.Time.Format
-import Text.Pandoc.Options
 import Hakyll
+
+import Text.Pandoc.Options
+import Text.Pandoc.Definition
+import Text.Pandoc.Walk (walk, walkM)
 import System.Locale
 
 main :: IO ()
@@ -45,7 +48,7 @@ main = hakyll $ do
 
     match "drafts/*" $ do
         route $ (customRoute draftRoute) `composeRoutes` (setExtension "html")
-        compile $ pandocCompiler'
+        compile $ pandocCompilerWithTransformM pandocMathReaderOptions pandocMathWriterOptions transformer
             >>= loadAndApplyTemplate "templates/post.html" (taggedPostCtx tags)
             >>= saveSnapshot "content"
             >>= loadAndApplyTemplate "templates/default.html" postCtx
@@ -180,4 +183,12 @@ modifTimeSubdirRoute x = do
   let path = year ++ "/" ++ month ++ "/" ++ day  ++ "/" ++ idAsFile
   return $ path
 
-draftRoute = toFilePath 
+draftRoute = toFilePath
+
+processDiagrams :: Block -> IO Block
+processDiagrams (CodeBlock (a, ["clojure"], c) codeStr) = return $ Para [Str "Holasss!"]
+processDiagrams x = return x
+
+transformer (Pandoc m bs0) = do
+--	bs1 <- mapM id bs0
+	unsafeCompiler $ walkM processDiagrams $ Pandoc m bs0

@@ -8,6 +8,7 @@ executable site
   build-depends:    base == 4.*
                   , hakyll == 4.6.*
                   , pandoc
+                  , pandoc-types
                   , containers
                   , old-locale
                   , time

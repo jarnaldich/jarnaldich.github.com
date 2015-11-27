@@ -2,8 +2,36 @@ code {
     color: black;
 }
 
+
+.highlight {
+    background-color: yellow;
+}
+
 pre code {
     color: black;
+}
+
+/*
+table {
+    width: 50%;
+} 
+*/
+
+
+table, th, td {
+    border: 1px solid black;
+}
+
+td {
+    padding-right: 1em;
+}
+
+th {
+    /* background-color: #8AC007; */
+    border-bottom: 1px solid black;
+    padding-right: 1em;
+    padding-left: 1em;
+    text-align: center;
 }
 
 /*Alignment tweaks for social sharing buttons*/
