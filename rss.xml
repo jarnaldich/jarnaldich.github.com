@@ -7,8 +7,150 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Wed, 26 Aug 2015 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Tue, 06 Jun 2017 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Porting the Unix Philosophy to Windows</title>
+    <link>http://jarnaldich.me/blog/2017/06/06/powershell-unix-philo.html</link>
+    <description><![CDATA[<h1>Porting the Unix Philosophy to Windows</h1>
+
+<small>Posted on June  6, 2017 <a href="/blog/2017/06/06/powershell-unix-philo.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>Since 2016, it is safe to say that windows has a <a href="https://en.wikipedia.org/wiki/PowerShell">pretty decent shell</a>. Actually, it’s had it from some time now, but on August 2016 went open-source and cross-platform. Although it is still common to find old-style <code>.bat</code> files lingering around in many organizations, it looks clear that PowerShell is getting out of its initial sysadmin niche towards becoming the new de-facto standard shell for Windows (hey, even for <a href="https://www.symantec.com/content/dam/symantec/docs/security-center/white-papers/increased-use-of-powershell-in-attacks-16-en.pdf">malware…</a>). And no, I do not even think WSH deserves a mention.</p>
+<p>Arguably, the most profound change use of PowerShell is not having a more powerful (ehem!) shell at windows, but enabling the kind of scripting Unix has excelled at before.</p>
+<h2 id="the-unix-philosophy">The Unix Philosophy</h2>
+<p>The <a href="https://en.wikipedia.org/wiki/Unix_philosophy">Unix Philosophy</a> is often epitomized in one sentence:</p>
+<blockquote>
+<p>Do One Thing and Do It Well</p>
+</blockquote>
+<p>The implications of that for shell scripting are translated into the fact that Unix has lots of small executables devoted to one task, and it is the shell’s responsibility to enable composing these bits of functionality into more complex ones, the most prominent tool for that being the pipe <code>|</code> operator, which feeds the output of a program into the input of the next.</p>
+<p>Powershell has a more ore less generalized version of this, where the pieces are called <code>CmdLets</code>, and what is sent down the pipe is a stream of <em>CLR objects</em>, not just a stream of bytes. Before PowerShell, it was impossible to do this in Windows to the extent that it was in Unix.</p>
+<p>The idea is simple, but the skill is difficult to master. Shell scripting <em>is</em> programming, but the abstractions provided by the shell are different from the ones you would find in a fully-fledged programming language.</p>
+<p>In this blog post I would like to present a particular example of what this change means.</p>
+<h1 id="the-task">The Task</h1>
+<p>A quick and dirty way to monitor the progress of a batch process is probing the number of output files in a directory at regular intervals and maybe save that to a file eg. for plotting, statistics, etc…</p>
+<p>It is quite probable that a developer would come up with a solution very much like the function below:</p>
+<pre class="powershell"><code>function Sample-Count-Files {
+    [CmdletBinding()]
+
+    param(
+        # The file pattern to count
+        [Parameter(Mandatory=$true, 
+                   Position=0)]
+        [string]$pattern,
+
+        # Name of the log file
+        [Parameter(Mandatory=$true, 
+            Position=1)]
+        [string]$logfile,
+
+        # Seconds interval between samples
+        [Parameter(Mandatory=$true, 
+            Position=2)]
+        [int]$seconds)
+
+    While($true) {
+        sleep $seconds;
+        $cnt = (dir $pattern).Count;
+        $d = Get-Date;
+        $d.ToString(&quot;yyyy-MM-dd HH:mm:ss&quot;) + &quot;`t$cnt&quot; | Out-File $logfile -encoding ascii -Append -ob 0
+    }
+}
+</code></pre>
+<p>That is, an infinte loop which waits for a number of seconds before counting the output files and outputting a line with the date and result. Executing the above code will block the console, so to monitor progress you can always wrap it into a <code>PSJob</code> or open a new console and then just tail the file:</p>
+<pre class="powershell"><code>gc -tail 10 -Wait samples.tsv</code></pre>
+<p>I suspect most developers that have not dealt with Unix scripting would come up with something along the lines of this. Conversely, my bet is any experienced Unix scripter would frown upon it, feeling the script is trying to do <em>too much</em>. In particular, it is in charge of:</p>
+<ul>
+<li><strong>The When</strong>: The counting is done every <em>n</em> seconds.</li>
+<li><strong>The What</strong>: The counting itself.</li>
+<li><strong>The Output</strong>: We are saving into a text file and redirecting to screen.</li>
+</ul>
+<p>These three pieces of functionality are coupled in our function, and they would’nt need to be so. For example, separating the <em>when</em> from the <em>what</em> would allow us to fire <em>any action</em> every <em>n</em> seconds.</p>
+<p>This is indeed not difficult in PowerShell, see:</p>
+<pre class="powershell"><code>function Tick {
+    [CmdletBinding()]
+    Param([Parameter(Mandatory=$true, Position=0)][int]$Seconds)
+    Process {
+        while($true) { 
+            Start-Sleep -Seconds $Seconds
+            Get-Date
+        }    
+    }
+}</code></pre>
+<p>This <code>CmdLet</code> waits for a number of seconds before sending a <code>Date</code> object downstream to do whatever we please with it, and loops (mind it is inside the <code>Process</code> section). It is like a pulse generating objects at regular intervals, so now we can reuse the <em>when</em> in different contexts:</p>
+<pre class="powershell"><code>Tick 10 | % { $_ }</code></pre>
+<p>We can write a similar function for the <em>what</em>. In a real scenario we probably would just write a one-liner, because our code is so simple, but in this post we will go the full way. As a bonus, instead of working with strings, we demonstrate how to pass custom objects down the pipeline. Here, we create an object with two members: the time and the file count.</p>
+<pre class="powershell"><code>
+function Count {
+    [CmdletBinding()]
+    Param(
+    	[Parameter(Mandatory=$true, Position=0)]
+	    [string]
+	    $Pattern,
+
+        [Parameter(Mandatory=$true, Position=1, ValueFromPipeline=$true)]
+	    $Time
+    )
+
+    Process {
+        [PSCustomObject]@{ 
+           Time=$Time; 
+           Files= $(dir $Pattern).Count 
+        }
+    }
+}
+</code></pre>
+<p>For the output, we could write our own function again, but it turns out there already is a Powershell function that formats objects into CSV files, conveniently named <code>Export-Csv</code>. Putting it all together:</p>
+<pre class="powershell"><code>Tick 1 -ob 0 | Count *.out | Export-Csv times.csv</code></pre>
+<p>Which is clean, easy to understand and easy to reuse, just like good <em>Unix</em> scripting is supposed to. By the way, if you are wondering where the <code>-ob 0</code> or <code>-ObjectBuffer 0</code> came from (we did not explicitly add it to our script), that is known as a <a href="https://msdn.microsoft.com/en-us/powershell/reference/5.1/microsoft.powershell.core/about/about_commonparameters">common parameter</a>. For efficiency reasons, Powershell can wait until a bunch of objects are accumulated into a buffer before sending them downstream. Obviously that is not what we want here, so we set the buffer size to 0.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>It is often a good idea, when approaching shell scripting, to take a step back and think whether we are trying to accomplish too much at once, and which pieces of functionality we would like to reuse in the future. That is not really different from the software architecture best practices applied when programming in the large, but the abstractions (programming whith pipes and streams) are. Now Windows programmers can apply the same principles at play in Unix for decades.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li>The sampling approach is probably too naive. For more robust approaches one should probably take a look into the <code>Timer</code> and <code>FileWatcher</code> events.</li>
+<li>This <a href="https://gist.github.com/jarnaldich/67296c892cde9f9c5bbe9d7ccac97ee9">Gist</a> has the code for this article.</li>
+</ul>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/powershell.html">powershell</a>, <a href="/tags/unix.html">unix</a>, <a href="/tags/windows.html">windows</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2017/06/06/powershell-unix-philo.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+]]></description>
+    <pubDate>Tue, 06 Jun 2017 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2017/06/06/powershell-unix-philo.html</guid>
+    <dc:creator>Joan Arnaldich</dc:creator>
+</item>
+<item>
     <title>Upserts in PosgreSQL</title>
     <link>http://jarnaldich.me/blog/2015/08/26/upserts-in-postgresql.html</link>
     <description><![CDATA[<h1>Upserts in PosgreSQL</h1>
