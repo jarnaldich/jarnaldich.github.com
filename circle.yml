@@ -3,7 +3,7 @@ dependencies:
     - "~/.stack"
   pre:
     - sudo apt-get update
-    - sudo wget -qO- https://get.haskellstack.org/ | sh
+    - stack upgrade
   override:
     - stack setup
     - stack build
