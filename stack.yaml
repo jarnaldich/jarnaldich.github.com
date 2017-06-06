@@ -1,6 +1,7 @@
 flags: {}
 packages:
 - '.'
-extra-deps: 
-            - Win32-notify-0.3.0.1
+extra-deps:
+- Win32-notify-0.3.0.1
+- hfsevents-0.1.6
 resolver: lts-2.22
