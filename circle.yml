@@ -2,7 +2,7 @@ dependencies:
   cache_directories:
     - "~/.stack"
   pre:
-    - apt-get update
+    - sudo apt-get update
     - wget -qO- https://get.haskellstack.org/ | sh
   override:
     - stack setup
