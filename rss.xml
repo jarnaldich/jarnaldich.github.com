@@ -7,8 +7,124 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Tue, 06 Jun 2017 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Tue, 02 Oct 2018 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Foreign Data Wrappers for Data Synchronization</title>
+    <link>http://jarnaldich.me/blog/2018/10/02/fdw-sync.html</link>
+    <description><![CDATA[<h1>Foreign Data Wrappers for Data Synchronization</h1>
+
+<small>Posted on October  2, 2018 <a href="/blog/2018/10/02/fdw-sync.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>The <a href="http://www.postgresqltutorial.com/postgresql-copy-database/">standard way</a> of copying databases (or just tables) between PostgreSQL servers seems to be through backup (with its many options). This article describes another way that I have been using lately using foreign data wrappers. The two servers need to be able to connect to each other (albeit only during the synchronization time), it does not need shell access to any of them and avoids generating intermediate files. The steps involved are:</p>
+<ol style="list-style-type: decimal">
+<li>Install the foreign data wrapper extension for your database (just once in the target server).</li>
+<li>Setup the foreign server connection from in the target server pointing to the source server.</li>
+<li>Setup a user mapping.</li>
+<li>Import the foreign tables (or schema) into a “proxy” schema.</li>
+<li>Create materialized views for the desired tables</li>
+</ol>
+<h2 id="install-the-foreign-data-wrapper">Install the Foreign Data Wrapper</h2>
+<p><a href="https://wiki.postgresql.org/wiki/Foreign_data_wrappers">Foreign Data Wrappers</a> are a mechanism that allow presenting external data sources as PostgreSQL tables. Note that it is not limited to foreign PostgreSQL databases: there are foreign data wrappers for other DB servers and other sources of data, including CSV files and even Twitter streams. Once the data is presented into Postgres, all the power of SQL becomes available for your data, so they are quite a feature for data management and integration.</p>
+<p>FDWs are installed as extensions for every kind of data source. Of course there is one FDW for connecting to external PostgreSQL databases in the standard distribution:</p>
+<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> EXTENSION postgres_fdw;</code></pre>
+<h2 id="creating-the-server">Creating the server</h2>
+<p>Once the extension is installed, the remote server needs to be set up:</p>
+<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> SERVER remote_server
+  <span class="kw">FOREIGN</span> <span class="kw">DATA</span> WRAPPER postgres_fdw
+  OPTIONS (host <span class="st">&#39;host_or_ip&#39;</span>, dbname <span class="st">&#39;db_name&#39;</span>);</code></pre>
+<h2 id="creating-the-user-mapping">Creating the user mapping</h2>
+<p>In order to allow for a greater flexibility in terms of permissions, the remote server needs a user mapping, wich will map users between the source and target servers. For every mapped user, the following sentence should be used:</p>
+<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> <span class="fu">USER</span> MAPPING <span class="kw">FOR</span> postgres SERVER perry
+    OPTIONS (<span class="kw">password</span> <span class="st">&#39;pwd&#39;</span>, <span class="ot">&quot;user&quot;</span> <span class="st">&#39;postgres&#39;</span>);</code></pre>
+<h2 id="create-the-foreign-tables">Create the foreign tables</h2>
+<p>Once the database and server are linked, we can start creating the foreign tables. Notice that foreign tables are just “proxies” for the external tables (think of them as symlinks in the file system or pointers in a programming language). That means creating them is just a matter of defining their structure, no data is transferred, and hence should be fast. The downside is that the description for the foreign tables has to be written in the target server (much like writing the table create script).</p>
+<p>In order to make the process easier, PostgreSQL has a command that will just import the foreign structure through:</p>
+<pre class="sourceCode sql"><code class="sourceCode sql">IMPORT <span class="kw">FOREIGN</span> <span class="kw">SCHEMA</span> source_schema <span class="kw">FROM</span> SERVER source_server <span class="kw">INTO</span> proxy_schema;</code></pre>
+<p>If you just want to import some tables of the schema, you can use:</p>
+<pre class="sourceCode sql"><code class="sourceCode sql">IMPORT <span class="kw">FOREIGN</span> <span class="kw">SCHEMA</span> <span class="kw">public</span> <span class="kw">LIMIT</span> <span class="kw">TO</span> 
+( table1, table2 )
+<span class="kw">FROM</span> SERVER source_server <span class="kw">INTO</span> proxy_schema;</code></pre>
+<p>Just refer to the [documentation] for other options.</p>
+<p>You can verify that the tables have been imported typing <code>\det</code> inside the <code>psql</code> cli.</p>
+<h2 id="instantiate-materialized-views">Instantiate materialized views</h2>
+<p>As stated before, foreign tables are just a proxy for the real data. In order to be able to work independently of the source server, actual data needs to be copied. The easiest way to do so in order to be able to update the data is through materialized views. You can think of them as new tables with a refresh mechanism. In particular, that means that the original indices over the data will be lost, so new indices should be created.</p>
+<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> <span class="kw">MATERIALIZED</span> <span class="kw">VIEW</span> view_name <span class="kw">AS</span> <span class="kw">SELECT</span> * <span class="kw">FROM</span> proxy_schema.table_name;</code></pre>
+<p>Whenever the data needs to be refreshed, just:</p>
+<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">REFRESH</span> <span class="kw">MATERIALIZED</span> <span class="kw">VIEW</span> view_name;</code></pre>
+<h2 id="in-the-command-line-client">In the command-line client</h2>
+<p>The following commands might be useful if you use the <code>psql</code> client&gt;</p>
+<ul>
+<li><code>\det &lt;pattern&gt;</code> lists foreign tables</li>
+<li><code>\des &lt;pattern&gt;</code> lists foreign servers</li>
+<li><code>\deu &lt;pattern&gt;</code> lists user mappings</li>
+<li><code>\dew &lt;pattern&gt;</code> lists foreign-data wrappers</li>
+<li><code>\dm &lt;pattern&gt;</code> list marterialized views</li>
+</ul>
+<h2 id="helper-function">Helper function</h2>
+<p>Depending on how many tables you wish to import, something along the following anonymous code block might be useful. It just creates the materialized views and indices, but it can be adapted to whatever is needed.</p>
+<pre class="sourceCode sql"><code class="sourceCode sql">DO $$
+<span class="kw">DECLARE</span> r <span class="dt">record</span>;
+<span class="kw">BEGIN</span>
+    <span class="kw">FOR</span> r <span class="kw">IN</span> <span class="kw">SELECT</span> tname <span class="kw">FROM</span> (<span class="kw">VALUES</span> 
+            (<span class="st">&#39;table1&#39;</span>),
+            (<span class="st">&#39;table2&#39;</span>), 
+            (<span class="st">&#39;...&#39;</span>), 
+            (<span class="st">&#39;tableN&#39;</span>)) <span class="kw">AS</span> x(tname)
+    <span class="kw">LOOP</span>
+        <span class="co">-- SQL automatically concatenates strings if there is a line separator in between</span>
+        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE MATERIALIZED VIEW IF NOT EXISTS %s AS &#39;</span>
+            <span class="st">&#39;SELECT * FROM proxy_schema.%s&#39;</span>,
+             r.tname, r.tname);
+        <span class="co">-- Index by geometry (Postgis), just an example</span>
+        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE INDEX IF NOT EXISTS sidx_%s ON %s USING GIST (geom)&#39;</span>,
+             r.tname, r.tname);
+    <span class="kw">END</span> <span class="kw">LOOP</span>;
+END$$</code></pre>
+<h2 id="conclusion-and-final-warnings">Conclusion and final warnings</h2>
+<p>This method can be convenient if data has to be synced frequently, as it just boils down to refreshing the materialized view. This can also be used from within other pgplsql functions, and needs no external tools (apart from a client) or intermediate files.</p>
+<p>It is not for every situation, though. In particular, <em>the data in materialized views are not backed up</em> (<code>psql</code> generates the view create script and performs a <code>REFRESH</code>). That means that if the original server is unavailable at restore time, data will be lost. This can be avoided by using regular <em>proxy</em> tables instead of materialized views.</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/postgres.html">postgres</a>, <a href="/tags/fdw.html">fdw</a>, <a href="/tags/backup.html">backup</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2018/10/02/fdw-sync.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+]]></description>
+    <pubDate>Tue, 02 Oct 2018 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2018/10/02/fdw-sync.html</guid>
+    <dc:creator>Joan Arnaldich</dc:creator>
+</item>
+<item>
     <title>Porting the Unix Philosophy to Windows</title>
     <link>http://jarnaldich.me/blog/2017/06/06/powershell-unix-philo.html</link>
     <description><![CDATA[<h1>Porting the Unix Philosophy to Windows</h1>
@@ -688,7 +804,9 @@ IN: scratchpad </code></pre>
 <p><strong>2011-08-14 UPDATE:</strong> This article can be used as a tutorial for implementing readtable extensions to Racket. If you just want the functionality, you can achieve it with the <code>at-exp</code> language, already included in Racket’s distribution. Just skip to the <a href="#at-exp">at-exp</a> section at the end of this tutorial to see how.</p>
 <h1 id="the-problem">The problem</h1>
 <p>This will probably sound familiar to any of you using windows paths or regexes in a language with strings supporting backslash escape sequences. Essentially, the problem is that instead of writing, for example:</p>
-<pre class="racket"><code>(directory-list &quot;\\MACHINE\Share\directory&quot;)</code></pre>
+<pre><code class="language-lisp">
+(directory-list "\\MACHINE\Share\directory")
+</code></pre>
 <p>You need to write:</p>
 <pre class="racket"><code>(directory-list &quot;\\\\MACHINE\\Share\\directory&quot;)</code></pre>
 <p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@&quot;&quot;</code> syntax, then you’d probably miss the feature.</p>

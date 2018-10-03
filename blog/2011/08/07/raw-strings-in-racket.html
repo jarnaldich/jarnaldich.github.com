@@ -12,11 +12,12 @@
         <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
        <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
         <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
     <body>
 <script type="text/javascript" async
         src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-
+	<script src="/js/prism.js"></script>
         <div class="container">
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -50,7 +51,9 @@
 <p><strong>2011-08-14 UPDATE:</strong> This article can be used as a tutorial for implementing readtable extensions to Racket. If you just want the functionality, you can achieve it with the <code>at-exp</code> language, already included in Racket’s distribution. Just skip to the <a href="#at-exp">at-exp</a> section at the end of this tutorial to see how.</p>
 <h1 id="the-problem">The problem</h1>
 <p>This will probably sound familiar to any of you using windows paths or regexes in a language with strings supporting backslash escape sequences. Essentially, the problem is that instead of writing, for example:</p>
-<pre class="racket"><code>(directory-list &quot;\\MACHINE\Share\directory&quot;)</code></pre>
+<pre><code class="language-lisp">
+(directory-list "\\MACHINE\Share\directory")
+</code></pre>
 <p>You need to write:</p>
 <pre class="racket"><code>(directory-list &quot;\\\\MACHINE\\Share\\directory&quot;)</code></pre>
 <p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@&quot;&quot;</code> syntax, then you’d probably miss the feature.</p>

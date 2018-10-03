@@ -3,19 +3,21 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-        <title>Joan Arnaldich - Home</title>
+        <title>Joan Arnaldich - Foreign Data Wrappers for Data Synchronization</title>
 
         <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
 
-        <link href="http://fonts.googleapis.com/css?family=Abel" rel="stylesheet" type="text/css">
-       <link rel="stylesheet" type="text/css" href="./css/syntax.css" />
-        <link rel="stylesheet" type="text/css" href="./css/custom.css" />
-        <link rel="stylesheet" type="text/css" href="./css/prism.css" />
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
+       <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
     <body>
-<script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-	<script src="./js/prism.js"></script>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
         <div class="container">
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -25,14 +27,14 @@
 
                         <div style="margin-top:20px;">
                             <div class="row">
-                                <div class="col-md-2"><a href="./"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
 
-                                <div class="col-md-2"><a href="./posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
-                                <div class="col-md-2"><a href="./tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
-                                <div class="col-md-2"><a href="./about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
                                 <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
                                 <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
-                                <div class="col-xs-1"><a href="./rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
                             </div>
                         </div>
                     </div>
@@ -42,7 +44,7 @@
                 <div class="col-md-10 col-md-offset-1">
                     <h1>Foreign Data Wrappers for Data Synchronization</h1>
 
-<small>Posted on October  2, 2018 <a href="./blog/2018/10/02/fdw-sync.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+<small>Posted on October  2, 2018 <a href="/blog/2018/10/02/fdw-sync.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <p>The <a href="http://www.postgresqltutorial.com/postgresql-copy-database/">standard way</a> of copying databases (or just tables) between PostgreSQL servers seems to be through backup (with its many options). This article describes another way that I have been using lately using foreign data wrappers. The two servers need to be able to connect to each other (albeit only during the synchronization time), it does not need shell access to any of them and avoids generating intermediate files. The steps involved are:</p>
 <ol style="list-style-type: decimal">
@@ -60,11 +62,11 @@
 <p>Once the extension is installed, the remote server needs to be set up:</p>
 <pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> SERVER remote_server
   <span class="kw">FOREIGN</span> <span class="kw">DATA</span> WRAPPER postgres_fdw
-  OPTIONS (host <span class="st">'host_or_ip'</span>, dbname <span class="st">'db_name'</span>);</code></pre>
+  OPTIONS (host <span class="st">&#39;host_or_ip&#39;</span>, dbname <span class="st">&#39;db_name&#39;</span>);</code></pre>
 <h2 id="creating-the-user-mapping">Creating the user mapping</h2>
 <p>In order to allow for a greater flexibility in terms of permissions, the remote server needs a user mapping, wich will map users between the source and target servers. For every mapped user, the following sentence should be used:</p>
 <pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> <span class="fu">USER</span> MAPPING <span class="kw">FOR</span> postgres SERVER perry
-    OPTIONS (<span class="kw">password</span> <span class="st">'pwd'</span>, <span class="ot">&quot;user&quot;</span> <span class="st">'postgres'</span>);</code></pre>
+    OPTIONS (<span class="kw">password</span> <span class="st">&#39;pwd&#39;</span>, <span class="ot">&quot;user&quot;</span> <span class="st">&#39;postgres&#39;</span>);</code></pre>
 <h2 id="create-the-foreign-tables">Create the foreign tables</h2>
 <p>Once the database and server are linked, we can start creating the foreign tables. Notice that foreign tables are just “proxies” for the external tables (think of them as symlinks in the file system or pointers in a programming language). That means creating them is just a matter of defining their structure, no data is transferred, and hence should be fast. The downside is that the description for the foreign tables has to be written in the target server (much like writing the table create script).</p>
 <p>In order to make the process easier, PostgreSQL has a command that will just import the foreign structure through:</p>
@@ -95,17 +97,17 @@
 <span class="kw">DECLARE</span> r <span class="dt">record</span>;
 <span class="kw">BEGIN</span>
     <span class="kw">FOR</span> r <span class="kw">IN</span> <span class="kw">SELECT</span> tname <span class="kw">FROM</span> (<span class="kw">VALUES</span> 
-            (<span class="st">'table1'</span>),
-            (<span class="st">'table2'</span>), 
-            (<span class="st">'...'</span>), 
-            (<span class="st">'tableN'</span>)) <span class="kw">AS</span> x(tname)
+            (<span class="st">&#39;table1&#39;</span>),
+            (<span class="st">&#39;table2&#39;</span>), 
+            (<span class="st">&#39;...&#39;</span>), 
+            (<span class="st">&#39;tableN&#39;</span>)) <span class="kw">AS</span> x(tname)
     <span class="kw">LOOP</span>
         <span class="co">-- SQL automatically concatenates strings if there is a line separator in between</span>
-        <span class="kw">EXECUTE</span> format(<span class="st">'CREATE MATERIALIZED VIEW IF NOT EXISTS %s AS '</span>
-            <span class="st">'SELECT * FROM proxy_schema.%s'</span>,
+        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE MATERIALIZED VIEW IF NOT EXISTS %s AS &#39;</span>
+            <span class="st">&#39;SELECT * FROM proxy_schema.%s&#39;</span>,
              r.tname, r.tname);
         <span class="co">-- Index by geometry (Postgis), just an example</span>
-        <span class="kw">EXECUTE</span> format(<span class="st">'CREATE INDEX IF NOT EXISTS sidx_%s ON %s USING GIST (geom)'</span>,
+        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE INDEX IF NOT EXISTS sidx_%s ON %s USING GIST (geom)&#39;</span>,
              r.tname, r.tname);
     <span class="kw">END</span> <span class="kw">LOOP</span>;
 END$$</code></pre>
@@ -116,7 +118,7 @@ END$$</code></pre>
 <div class="panel panel-default">
     <div class="panel-body">
         <div class="pull-left">
-            Tags: <a href="./tags/postgres.html">postgres</a>, <a href="./tags/fdw.html">fdw</a>, <a href="./tags/backup.html">backup</a>
+            Tags: <a href="/tags/postgres.html">postgres</a>, <a href="/tags/fdw.html">fdw</a>, <a href="/tags/backup.html">backup</a>
         </div>
         <div class="social pull-right">
             <span class="twitter">
@@ -125,7 +127,8 @@ END$$</code></pre>
 
              <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
              <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/" size="medium"></g:plusone>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
              </span>
             
         </div>
@@ -135,7 +138,7 @@ END$$</code></pre>
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
 <div id="disqus_thread"></div>  
-<script type"text javascript">
+<script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
           var dsq = document.createElement('script');
@@ -147,7 +150,6 @@ END$$</code></pre>
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
     
-
 
                 </div>
             </div>

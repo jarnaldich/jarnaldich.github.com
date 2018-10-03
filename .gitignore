@@ -1,3 +1,5 @@
+_cache
+.stack-work
 _site
 \#*\#
 *.hi
