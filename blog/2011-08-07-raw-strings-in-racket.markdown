@@ -27,9 +27,9 @@ regexes in a language with strings supporting backslash escape
 sequences. Essentially, the problem is that instead of writing, for
 example:
 
-```racket
+<pre><code class="language-lisp">
 (directory-list "\\MACHINE\Share\directory")
-```
+</code></pre>
 
 You need to write:
 

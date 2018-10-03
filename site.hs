@@ -28,6 +28,11 @@ main = hakyll $ do
         route idRoute
         compile copyFileCompiler
 
+    match "js/**" $ do
+        route idRoute
+        compile copyFileCompiler
+
+
     match "about.mkd" $ do
         route   $ setExtension "html"
         compile $ pandocCompiler'
