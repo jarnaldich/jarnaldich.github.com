@@ -1,6 +1,6 @@
 ---
-title: Haskell Gotchas: Strings
-date: 2013-09-09T00:00:00
+title: "Haskell Gotchas: Strings"
+date: "2013-09-09T00:00:00"
 tags: haskell, gotchas, strings
 ---
 

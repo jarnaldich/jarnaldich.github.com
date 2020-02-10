@@ -11,7 +11,6 @@ import Hakyll
 import Text.Pandoc.Options
 import Text.Pandoc.Definition
 import Text.Pandoc.Walk (walk, walkM)
-import System.Locale
 
 main :: IO ()
 main = hakyll $ do
@@ -120,8 +119,8 @@ main = hakyll $ do
     --loading the templated
     match "templates/*" $ compile templateCompiler
 
-extensions :: Set.Set Extension
-extensions = Set.fromList [Ext_inline_notes, Ext_tex_math_dollars]
+-- extensions :: Set.Set Extension
+extensions = extensionsFromList [Ext_inline_notes, Ext_tex_math_dollars]
 
 feedConfig :: FeedConfiguration
 feedConfig = FeedConfiguration {
@@ -140,12 +139,12 @@ pandocCompiler' = pandocCompilerWith pandocMathReaderOptions pandocMathWriterOpt
 
 pandocMathReaderOptions :: ReaderOptions
 pandocMathReaderOptions = defaultHakyllReaderOptions {
-        readerExtensions = Set.union (readerExtensions defaultHakyllReaderOptions) extensions
+        readerExtensions =  extensions `mappend` (readerExtensions defaultHakyllReaderOptions) 
     }
 
 pandocMathWriterOptions :: WriterOptions
 pandocMathWriterOptions  = defaultHakyllWriterOptions {
-        writerExtensions = Set.union (writerExtensions defaultHakyllWriterOptions) extensions,
+        writerExtensions = mappend extensions (writerExtensions defaultHakyllWriterOptions),
         writerHTMLMathMethod = MathJax ""
 }
 
@@ -196,4 +195,4 @@ processDiagrams x = return x
 
 transformer (Pandoc m bs0) = do
 --	bs1 <- mapM id bs0
-	unsafeCompiler $ walkM processDiagrams $ Pandoc m bs0
+   unsafeCompiler $ walkM processDiagrams $ Pandoc m bs0

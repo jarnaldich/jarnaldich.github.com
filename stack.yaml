@@ -1,8 +1,7 @@
 flags: {}
+allow-newer: true
 packages:
 - '.'
 extra-deps:
-- Win32-notify-0.3.0.1
-- hfsevents-0.1.6
-- Cabal-1.24.2.0
-resolver: lts-2.22
+- hakyll-4.13.0.1
+resolver: lts-14.25
