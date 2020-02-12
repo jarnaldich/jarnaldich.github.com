@@ -2,6 +2,7 @@
 
 import Control.Applicative ((<$>))
 import Data.Monoid
+import Data.Functor
 import qualified Data.Set as Set
 import System.Directory (getModificationTime)
 import Data.Time.Clock
@@ -11,6 +12,8 @@ import Hakyll
 import Text.Pandoc.Options
 import Text.Pandoc.Definition
 import Text.Pandoc.Walk (walk, walkM)
+
+import qualified Skylighting as Sky
 
 main :: IO ()
 main = hakyll $ do
@@ -31,6 +34,17 @@ main = hakyll $ do
         route idRoute
         compile copyFileCompiler
 
+    match "syntax/*.xml" $ compile $ do
+      path <- toFilePath <$> getUnderlying
+      contents <- itemBody <$> getResourceBody
+      debugCompiler ("Loaded syntax definition from " ++ show path)
+      res <- unsafeCompiler (Sky.parseSyntaxDefinitionFromString path contents)
+      _ <- saveSnapshot "syntax" =<< case res of
+        Left e -> fail e
+        Right x -> makeItem x
+      makeItem contents
+
+    match "syntax/*.xml" $ compile getResourceBody
 
     match "about.mkd" $ do
         route   $ setExtension "html"
@@ -135,7 +149,8 @@ mostRecentPost :: Compiler (Item String)
 mostRecentPost = head <$> (recentFirst =<< loadAllSnapshots "blog/*" "content")
 
 pandocCompiler' :: Compiler (Item String)
-pandocCompiler' = pandocCompilerWith pandocMathReaderOptions pandocMathWriterOptions
+--pandocCompiler' = pandocCompilerWith pandocMathReaderOptions pandocMathWriterOptions
+pandocCompiler' = pandocCompilerWith pandocMathReaderOptions =<< writerOptions
 
 pandocMathReaderOptions :: ReaderOptions
 pandocMathReaderOptions = defaultHakyllReaderOptions {
@@ -196,3 +211,20 @@ processDiagrams x = return x
 transformer (Pandoc m bs0) = do
 --	bs1 <- mapM id bs0
    unsafeCompiler $ walkM processDiagrams $ Pandoc m bs0
+
+
+writerOptions :: Compiler WriterOptions
+writerOptions = do
+  syntaxMap <- loadAllSnapshots "syntax/*.xml" "syntax"
+           <&> foldr (Sky.addSyntaxDefinition . itemBody) Sky.defaultSyntaxMap
+
+  pure $ defaultHakyllWriterOptions
+    { writerExtensions = extensionsFromList
+                         [ Ext_tex_math_dollars
+                         , Ext_tex_math_double_backslash
+                         , Ext_latex_macros
+                         ] <> writerExtensions defaultHakyllWriterOptions
+    , writerHTMLMathMethod = MathJax ""
+    , writerSyntaxMap = syntaxMap
+    , writerHighlightStyle = Just Sky.pygments
+    }

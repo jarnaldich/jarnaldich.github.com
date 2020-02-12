@@ -11,6 +11,7 @@ executable site
                   , pandoc-types
                   , containers
                   , old-locale
+                  , skylighting >= 0.8
                   , time
                   , directory 
   ghc-options:      -threaded

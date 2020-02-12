@@ -65,7 +65,7 @@ From the above data, the grid can be represented as a 2d array within the bounds
 of a minimum and maximum columns.
 
 
-``` ampl
+``` minizinc
 int: mincol = min([ Orthos[i, ocol] | i in 1..northos ]);
 int: maxcol = max([ Orthos[i, ocol] | i in 1..northos ]);
 int: minrow = min([ Orthos[i, orow] | i in 1..northos ]);
@@ -79,8 +79,12 @@ array[minrow..maxrow, mincol..maxcol] of int: Grid =
 
 ### Box representation
 
-``` 
 
+
+``` powershell
+$ENV:FLATZINC_CMD = "fzn-gecode"
+$Env:PATH += ";D:\Soft\MiniZinc\"
+minizinc.exe -I D:\Soft\MiniZinc\share\minizinc\gecode\ .\tall5m.mzn .\tall5m.dzn | ? { $_ -match "Ortho: " } | % { $_ -replace "Ortho: " } | out-file -encoding ascii assign5.csv
 ```
 
 ## Conclusions
