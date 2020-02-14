@@ -1,5 +1,6 @@
 code {
     color: black;
+    font-family: 'Source Code Pro', monospace ;
 }
 
 
@@ -81,4 +82,35 @@ sup  {
 
 .page-header h1 {
     font-family: 'Abel', sans-serif;
+}
+
+ul, ol {
+	font-family: 'Quicksand', sans-serif;
+	font-size: 18px;
+	font-weight: 500; 
+	font-style: normal;
+	text-align: justify;
+	margin-bottom: 1.1em;
+}
+
+p {
+	font-family: 'Quicksand', sans-serif;
+	font-size: 18px;
+	font-weight: 500; 
+	font-style: normal;
+	text-align: justify;
+	margin-bottom: 1.1em;
+}
+
+h2, h3 { margin-top: 1.5em };
+
+figure {
+	text-align: center;
+}
+
+.center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 60%;
 }
