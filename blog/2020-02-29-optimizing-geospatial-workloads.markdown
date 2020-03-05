@@ -240,6 +240,9 @@ is the result for 4 boxes:
 
 ![](/images/tiles5k_colored.png "Orthophoto Tiling"){.center}
 
+For 8 boxes (8 parallel processors), the result would be:
+
+![](/images/tiles5k_8box_colored.png "Orthophoto Tiling"){.center}
 
 ## Conclusions
 
