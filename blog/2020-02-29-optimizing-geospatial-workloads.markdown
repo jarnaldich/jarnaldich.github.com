@@ -72,14 +72,14 @@ tile in that position, and `false` otherwise. This builds a nice representation
 for modelling the spatial restrictions in the problem.
 
 ``` minizinc
-int: mincol = min([ Orthos[i, ocol] | i in 1..northos ]);
-int: maxcol = max([ Orthos[i, ocol] | i in 1..northos ]);
-int: minrow = min([ Orthos[i, orow] | i in 1..northos ]);
-int: maxrow = max([ Orthos[i, orow] | i in 1..northos ]);
+int: mincol = min([ Tiles[i, ocol] | i in 1..ntiles ]);
+int: maxcol = max([ Tiles[i, ocol] | i in 1..ntiles ]);
+int: minrow = min([ Tiles[i, orow] | i in 1..ntiles ]);
+int: maxrow = max([ Tiles[i, orow] | i in 1..ntiles ]);
 
 array[minrow..maxrow, mincol..maxcol] of int: Grid =
   array2d(minrow..maxrow, mincol..maxcol,
-     [ exists(i in 1..northos)(Orthos[i, orow] == r /\ Orthos[i, ocol] == c)
+     [ exists(i in 1..ntiles)(Tiles[i, orow] == r /\ Tiles[i, ocol] == c)
        | r in minrow..maxrow, c in mincol..maxcol ]);
 ```
 
@@ -128,8 +128,8 @@ forall(b1,b2 in 1..nboxes where b1 < b2) (
 ### Assignment
 
 In the end we want an array relating every tile with its box. Since we chose to
-represent a tile by its row and column, this can be modelled as a 2d array of
-nboxes. We will reserve a special 0 value for the empty tiles within the grid.
+represent a tile by its row and column, this can be modeled as a 2d array of
+`nboxes`. We will reserve a special 0 value for the empty tiles within the grid.
 
 ``` minizinc
 array[minrow..maxrow, mincol..maxcol] of var 0..nboxes: Assignment;
@@ -211,9 +211,10 @@ minizinc.exe -I D:\Soft\MiniZinc\share\minizinc\gecode\ .\tall5m.mzn .\tall5m.dz
 
 ### Not so fast!
 
-For big grids, the process is too slow. A practical way to solve that is
-including further “artificial” restrictions that capture some common-sense
-knowledge. Here we can set that box cardinalities belong to an environment around a
+For big grids, the process is too slow (on my hardware, ymmv). A practical way
+to mitigate that problem is including further “artificial” restrictions that
+capture some common-sense knowledge. Here we can set that box cardinalities
+belong to an environment around a
 _perfect_ one, which would happen when every box has `ntiles / nboxes` tiles.
 
 We can define a parameter `slack`, that will represent the radius of the
@@ -243,11 +244,14 @@ is the result for 4 boxes:
 ## Conclusions
 
 Even when I know the basic theory behind mixed integer and fp solvers (even
-implemented a simplex-based solver as a practical exercise for another course),
+implemented a simplex-based solver as a practical exercise in the past),
 I keep having the feeling there is some form of magic at work here.
 
-The model includes all restrictions explicitly, some of them are included in
-some form in the `globals` library, which is probably more efficient and would
-lead to more terse code. I would like to rewrite the model using these functions
-and compare in a follow-up.
+There are lots of other ways to model this problem. In particular, MiniZinc has
+special primitives for dealing with sets. Some of the restriction explicitly
+stated by the model are already available for reuse in the `globals` library,
+which would probably more efficient and would lead to terser code. I would
+like to rewrite the model using these functions and compare their efficiency if
+I ever have the time. 
 
+For now, I got my results!

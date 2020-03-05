@@ -47,8 +47,13 @@
 				<keyword attribute="Control" context="#stay" String="control" />
 				<Float attribute="Float" context="#stay"/>
 				<Int attribute="Float" context="#stay"/>
+        <DetectChar attribute="Comment" context="LineComment" char="%" />
 			</context>
 		</contexts>
+
+    <context attribute="Comment" lineEndContext="#pop" name="LineComment">
+        <LineContinue attribute="Comment" context="#stay"/>
+    </context>
 
 		<itemDatas>
 			<itemData name="Normal Text"     defStyleNum="dsNormal"   color="#000000" selColor="#ffffff" bold="0" italic="0"/>
@@ -58,6 +63,7 @@
 			<itemData name="BuiltIns"         defStyleNum="dsKeyword"  color="#800000" selColor="#ffffff" bold="0" italic="0"/>
 			<itemData name="Control"       defStyleNum="dsControlFlow"  color="#000080" selColor="#ffffff" bold="0" italic="0"/>
 			<itemData name="Float"           defStyleNum="dsFloat"    color="#0000ff" selColor="#ffffff" bold="0" italic="0"/>
+			<itemData name="Comment"           defStyleNum="dsComment"    color="#CCCCCC" selColor="#ffffff" bold="0" italic="0"/>
 		</itemDatas>
 	</highlighting>
 
