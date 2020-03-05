@@ -10,7 +10,11 @@
               rel="stylesheet">
 
         <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
-       <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
         <link rel="stylesheet" type="text/css" href="/css/custom.css" />
         <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
@@ -56,10 +60,10 @@
 </code></pre>
 <p>You need to write:</p>
 <pre class="racket"><code>(directory-list &quot;\\\\MACHINE\\Share\\directory&quot;)</code></pre>
-<p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@&quot;&quot;</code> syntax, then you’d probably miss the feature.</p>
+<p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@""</code> syntax, then you’d probably miss the feature.</p>
 <h1 id="the-plan">The plan</h1>
 <p>Racket is extensible by design. When we run a racket program, there are several stages involved:</p>
-<ol style="list-style-type: decimal">
+<ol type="1">
 <li><p>First, a <em>reader</em> layer turns a stream of characters into a kind of AST. Since racket is a lisp, this AST is, of course, made up of s-expressions. But in Racket’s case, they’re a particular kind of s-expressions which contain extra information on their lexical scope and their source location, and are called <em>syntax objects</em>.</p></li>
 <li><p>After that, those syntax objects are further expanded through the macro layer.</p></li>
 </ol>
@@ -108,7 +112,7 @@
                            ))) ; check location info
   
   (to-syntax  (strip-last-char (bytes-&gt;string/locale (car raw-str)))))</code></pre>
-<p>If you name the above module as <code>reader_extension.rkt</code>, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending <code>#reader&quot;reader_extension.rkt&quot;</code>. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it’s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.</p>
+<p>If you name the above module as <code>reader_extension.rkt</code>, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending <code>#reader"reader_extension.rkt"</code>. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it’s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.</p>
 <p>See these rackunit tests for an example:</p>
 <pre class="racket"><code>(require rackunit)
 (check-equal? #reader&quot;reader_extension.rkt&quot;(\\TEST\One) 
@@ -117,12 +121,12 @@
 (check-equal? #reader&quot;reader_extension.rkt&quot;_\test\no\escape_ 
               &quot;\\test\\no\\escape&quot;)</code></pre>
 <h1 id="the-readtable-hook">The readtable hook</h1>
-<p>While the above fully works, It may not save much typing having to write <code>#reader&quot;reader_extension.rkt&quot;</code> instead of manually backslashing the string. It would be more convenient to just use one character, for example <code>$</code>, like this:</p>
+<p>While the above fully works, It may not save much typing having to write <code>#reader"reader_extension.rkt"</code> instead of manually backslashing the string. It would be more convenient to just use one character, for example <code>$</code>, like this:</p>
 <pre class="racket"><code>(directory-list $(\\SERVER\Share))</code></pre>
 <p>Fortunately, that’s pretty easy: the racket reader is implemented as a recursive descent parser, and you can hook your own functions to call back when the parser sees a character. This association between characters and callbacks is known as the readtable.</p>
 <p>The readtable has a dynamic scope (it’s a <code>parameter</code>), and every call to the <code>read</code> and <code>read-syntax</code> functions is performed in the context of a readtable. There is, of course, a starting default readtable in case the user didn’t specify one.</p>
 <h1 id="using-the-extension-as-a-language">Using the extension as a language</h1>
-<p>The other drawback of using the <code>#reader&quot;reader_extension.rkt&quot;</code> prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:</p>
+<p>The other drawback of using the <code>#reader"reader_extension.rkt"</code> prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:</p>
 <pre class="racket"><code>#lang with-raw-string racket #\%
 (regexp-split (pregexp %&#39;\s&#39;) &quot;two fields&quot;)</code></pre>
 <p>Meaning that you add raw string syntax on top of the <code>racket</code> language with <code>%</code> as your readtable character.</p>

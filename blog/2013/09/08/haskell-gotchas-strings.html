@@ -10,7 +10,11 @@
               rel="stylesheet">
 
         <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
-       <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
         <link rel="stylesheet" type="text/css" href="/css/custom.css" />
         <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
@@ -59,25 +63,25 @@
 <h2 id="the-basics">The Basics</h2>
 <p>Here’s what most Haskellers would recommend:</p>
 <p><strong>If you do not care about Unicode</strong>, use <code>Data.ByteString.Char8</code>, which is a packed array of <code>Char8</code> (bytes). The lazy variant is <code>Data.ByteString.Lazy.Char8</code>. This will be enough if you can assume your input is in (a subset of) <em>latin-1</em>.</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.ByteString.Char8</span> <span class="kw">as</span> <span class="dt">B</span></code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.ByteString.Char8</span> <span class="kw">as</span> <span class="dt">B</span></span></code></pre></div>
 <p>or</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.ByteString.Lazy.Char8</span> <span class="kw">as</span> <span class="dt">B</span></code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.ByteString.Lazy.Char8</span> <span class="kw">as</span> <span class="dt">B</span></span></code></pre></div>
 <p><strong>If you care about Unicode</strong>, go use <code>Data.Text.Text</code>:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
-<span class="kw">import qualified</span> <span class="dt">Data.Text.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></span></code></pre></div>
 <p>or</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text.Lazy</span> <span class="kw">as</span> <span class="dt">T</span>
-<span class="kw">import qualified</span> <span class="dt">Data.Text.Lazy.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.Lazy</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.Lazy.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></span></code></pre></div>
 <p>If you need regular expressions with Unicode, though, the thing gets a little more <a href="http://stackoverflow.com/questions/14922579/haskell-regular-expressions-and-data-text">involved</a>.</p>
 <h2 id="back-and-forth">Back and forth</h2>
 <p>Even if you use these types, you will still need <code>Prelude.String</code> in your code: there are a lot of libraries which will expect and return <code>String</code>s. As an example, the <code>FilePath</code> type for file and directory manipulation is just an alias for <code>String</code>. Also, every string literal in your code will be parsed as a <code>String</code> by default (but see below), so converting from <em>packed</em> <code>ByteArrays</code> to <em>unpacked</em> <code>String</code>s is achived, not surprisingly, by the functions <code>pack</code> and <code>unpack</code>. In fact, using <code>String</code> in your APIs, as long as they’re not too large, is one (the only?) sensible use for <code>Strings</code>.</p>
 <p>For the <a href="http://www.haskell.org/ghc/">GHC</a> stack you can avoid packing and unpacking string literals by using the <code>OverloadedStrings</code> pragma. Ie. instead of writing:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
-myFuncExpectingDataText <span class="fu">.</span> T.pack <span class="fu">$</span> <span class="st">&quot;Hello World!&quot;</span></code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb5-1"><a href="#cb5-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb5-2"><a href="#cb5-2"></a>myFuncExpectingDataText <span class="op">.</span> T.pack <span class="op">$</span> <span class="st">&quot;Hello World!&quot;</span></span></code></pre></div>
 <p>you can add the pragma that makes the call to <code>T.pack</code> unnecessary:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span>
-<span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
-myFuncExpectingDataText <span class="st">&quot;Hello World!&quot;</span></code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb6-1"><a href="#cb6-1"></a><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></span>
+<span id="cb6-2"><a href="#cb6-2"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb6-3"><a href="#cb6-3"></a>myFuncExpectingDataText <span class="st">&quot;Hello World!&quot;</span></span></code></pre></div>
 <h2 id="conclusions">Conclusions</h2>
 <p>Here’s my piece of advice:</p>
 <ul>

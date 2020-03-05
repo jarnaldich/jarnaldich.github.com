@@ -10,7 +10,11 @@
               rel="stylesheet">
 
         <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
-       <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
         <link rel="stylesheet" type="text/css" href="/css/custom.css" />
         <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
@@ -50,7 +54,7 @@
 <h2 id="what-is-it">What is it?</h2>
 <p>As its name suggests, it is something that combines the functionality of an insert and an update.</p>
 <p>Like when:</p>
-<ol style="list-style-type: decimal">
+<ol type="1">
 <li>You want to update a field of a record if it exists, or insert it with that field value if it does not.</li>
 <li>You have a process that inserts incrementally into a DB table, in which you may want to make sure that a certain record exists, and do not want to fail with a duplicate key error if it is already there (you are using the database as a <code>set</code> or <code>bag</code> data structure).</li>
 <li>A generalization of 1: you want to update a field of a record with a function of the old value (eg. incrementing), or assign it a default value if the record does not exist.</li>
@@ -58,45 +62,45 @@
 <h2 id="ok.-how-can-i-do-this">Ok. How can I do this?</h2>
 <p>Well, first thing is to check your PostgreSQL version. Versions 9.5 will have this functionality built-in (as many other RDBMS do) through the use of the <code>INSERT ... ON CONFLICT</code> clause. See the <a href="https://wiki.postgresql.org/wiki/UPSERT">discussion</a>.</p>
 <p>At the time of writing this, 9.5 is not available, and anyway many of us are forced to work with legacy versions, so here I will discuss a couple of ways to achive this functionality. Notice that geting this right is not easy, since concurrency and transaction issues must be taken into account. In particular, doing this in your code:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">if</span> (<span class="kw">SELECT</span> whatever <span class="kw">to</span> <span class="kw">check</span> <span class="kw">if</span> <span class="dt">record</span> <span class="kw">exists</span>)
-    <span class="kw">UPDATE</span> it
-<span class="kw">else</span> 
-   <span class="kw">INSERT</span> IT</code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1"></a><span class="cf">if</span> (<span class="kw">SELECT</span> whatever <span class="kw">to</span> <span class="kw">check</span> <span class="cf">if</span> <span class="dt">record</span> <span class="kw">exists</span>)</span>
+<span id="cb1-2"><a href="#cb1-2"></a>    <span class="kw">UPDATE</span> it</span>
+<span id="cb1-3"><a href="#cb1-3"></a><span class="cf">else</span> </span>
+<span id="cb1-4"><a href="#cb1-4"></a>   <span class="kw">INSERT</span> IT</span></code></pre></div>
 <p>or alternatively,</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">if</span>(<span class="kw">UPDATE</span> affects one <span class="kw">or</span> more records) 
-  <span class="co">-- we&#39;re done</span>
-<span class="kw">else</span> 
-  <span class="kw">INSERT</span> <span class="dt">record</span>;</code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1"></a><span class="cf">if</span>(<span class="kw">UPDATE</span> affects one <span class="kw">or</span> more records) </span>
+<span id="cb2-2"><a href="#cb2-2"></a>  <span class="co">-- we&#39;re done</span></span>
+<span id="cb2-3"><a href="#cb2-3"></a><span class="cf">else</span> </span>
+<span id="cb2-4"><a href="#cb2-4"></a>  <span class="kw">INSERT</span> <span class="dt">record</span>;</span></code></pre></div>
 <p>Will not work even inside a transaction. The default isolation level for transactions will only guarantee that other connections do not see your intermediate changes and that all of your changes succed or fail at once. (That is, the A(tomic) and I(solated) in ACID). If two different transactions query the db concurrently for a new ID, they might both get the same ID, and the transaction will fail. Setting the transaction level to SERIALIZABLE would work (think of transactions running inside a mutual exclusion region), but the application code should be ready to retry the transaction.</p>
 <h2 id="the-general-solutions">The general solution(s)</h2>
 <p>So if you want a general solution that works for all of the 3 cases stated previously, you should probably write a stored procedure in the DB like the <a href="http://www.postgresql.org/docs/current/static/plpgsql-control-structures.html#PLPGSQL-UPSERT-EXAMPLE">documentation suggests</a>:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> <span class="kw">TABLE</span> db (a <span class="dt">INT</span> <span class="kw">PRIMARY</span> <span class="kw">KEY</span>, b TEXT);
-
-<span class="kw">CREATE</span> <span class="kw">FUNCTION</span> merge_db(<span class="kw">key</span> <span class="dt">INT</span>, <span class="kw">data</span> TEXT) RETURNS VOID <span class="kw">AS</span>
-$$
-<span class="kw">BEGIN</span>
-    <span class="kw">LOOP</span>
-        <span class="co">-- first try to update the key</span>
-        <span class="kw">UPDATE</span> db <span class="kw">SET</span> b = <span class="kw">data</span> <span class="kw">WHERE</span> a = <span class="kw">key</span>;
-        <span class="kw">IF</span> found <span class="kw">THEN</span>
-            <span class="kw">RETURN</span>;
-        <span class="kw">END</span> <span class="kw">IF</span>;
-        <span class="co">-- not there, so try to insert the key</span>
-        <span class="co">-- if someone else inserts the same key concurrently,</span>
-        <span class="co">-- we could get a unique-key failure</span>
-        <span class="kw">BEGIN</span>
-            <span class="kw">INSERT</span> <span class="kw">INTO</span> db(a,b) <span class="kw">VALUES</span> (<span class="kw">key</span>, <span class="kw">data</span>);
-            <span class="kw">RETURN</span>;
-        <span class="kw">EXCEPTION</span> <span class="kw">WHEN</span> unique_violation <span class="kw">THEN</span>
-            <span class="co">-- Do nothing, and loop to try the UPDATE again.</span>
-        <span class="kw">END</span>;
-    <span class="kw">END</span> <span class="kw">LOOP</span>;
-<span class="kw">END</span>;
-$$
-LANGUAGE plpgsql;
-
-<span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;david&#39;</span>);
-<span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;dennis&#39;</span>);</code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> db (a <span class="dt">INT</span> <span class="kw">PRIMARY</span> <span class="kw">KEY</span>, b TEXT);</span>
+<span id="cb3-2"><a href="#cb3-2"></a></span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">CREATE</span> <span class="kw">FUNCTION</span> merge_db(<span class="kw">key</span> <span class="dt">INT</span>, <span class="kw">data</span> TEXT) RETURNS VOID <span class="kw">AS</span></span>
+<span id="cb3-4"><a href="#cb3-4"></a>$$</span>
+<span id="cb3-5"><a href="#cb3-5"></a><span class="cf">BEGIN</span></span>
+<span id="cb3-6"><a href="#cb3-6"></a>    <span class="cf">LOOP</span></span>
+<span id="cb3-7"><a href="#cb3-7"></a>        <span class="co">-- first try to update the key</span></span>
+<span id="cb3-8"><a href="#cb3-8"></a>        <span class="kw">UPDATE</span> db <span class="kw">SET</span> b <span class="op">=</span> <span class="kw">data</span> <span class="kw">WHERE</span> a <span class="op">=</span> <span class="kw">key</span>;</span>
+<span id="cb3-9"><a href="#cb3-9"></a>        <span class="cf">IF</span> found <span class="cf">THEN</span></span>
+<span id="cb3-10"><a href="#cb3-10"></a>            <span class="kw">RETURN</span>;</span>
+<span id="cb3-11"><a href="#cb3-11"></a>        <span class="cf">END</span> <span class="cf">IF</span>;</span>
+<span id="cb3-12"><a href="#cb3-12"></a>        <span class="co">-- not there, so try to insert the key</span></span>
+<span id="cb3-13"><a href="#cb3-13"></a>        <span class="co">-- if someone else inserts the same key concurrently,</span></span>
+<span id="cb3-14"><a href="#cb3-14"></a>        <span class="co">-- we could get a unique-key failure</span></span>
+<span id="cb3-15"><a href="#cb3-15"></a>        <span class="cf">BEGIN</span></span>
+<span id="cb3-16"><a href="#cb3-16"></a>            <span class="kw">INSERT</span> <span class="kw">INTO</span> db(a,b) <span class="kw">VALUES</span> (<span class="kw">key</span>, <span class="kw">data</span>);</span>
+<span id="cb3-17"><a href="#cb3-17"></a>            <span class="kw">RETURN</span>;</span>
+<span id="cb3-18"><a href="#cb3-18"></a>        <span class="kw">EXCEPTION</span> <span class="cf">WHEN</span> unique_violation <span class="cf">THEN</span></span>
+<span id="cb3-19"><a href="#cb3-19"></a>            <span class="co">-- Do nothing, and loop to try the UPDATE again.</span></span>
+<span id="cb3-20"><a href="#cb3-20"></a>        <span class="cf">END</span>;</span>
+<span id="cb3-21"><a href="#cb3-21"></a>    <span class="cf">END</span> <span class="cf">LOOP</span>;</span>
+<span id="cb3-22"><a href="#cb3-22"></a><span class="cf">END</span>;</span>
+<span id="cb3-23"><a href="#cb3-23"></a>$$</span>
+<span id="cb3-24"><a href="#cb3-24"></a>LANGUAGE plpgsql;</span>
+<span id="cb3-25"><a href="#cb3-25"></a></span>
+<span id="cb3-26"><a href="#cb3-26"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;david&#39;</span>);</span>
+<span id="cb3-27"><a href="#cb3-27"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;dennis&#39;</span>);</span></code></pre></div>
 <p>This solution has the advantage of delegating db-specific code into the DB and simplifying the SQL queries on the application side.</p>
 <h3 id="other-options">Other options</h3>
 <ul>
@@ -106,8 +110,8 @@ LANGUAGE plpgsql;
 </ul>
 <h2 id="partial-solutions">Partial solutions</h2>
 <p>If you know in advance that your process will not run concurrently, then all of the above can be greatly simplified. For example, if just want to make sure that a record exists in the db (and not fail with a duplicate key entry the second time), a combination of an INSERT and a SELECT will work, making use of the fact that INSERTS will accept a sub-SELECT instead of a VALUES clause:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">INSERT</span> <span class="kw">INTO</span> TEST (whatever, counter)
-    <span class="kw">SELECT</span> <span class="dv">123</span>, <span class="dv">1</span> <span class="kw">WHERE</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> (<span class="kw">SELECT</span> * <span class="kw">FROM</span> test <span class="kw">WHERE</span> whatever = <span class="dv">123</span>);</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> TEST (whatever, counter)</span>
+<span id="cb4-2"><a href="#cb4-2"></a>    <span class="kw">SELECT</span> <span class="dv">123</span>, <span class="dv">1</span> <span class="kw">WHERE</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> (<span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> test <span class="kw">WHERE</span> whatever <span class="op">=</span> <span class="dv">123</span>);</span></code></pre></div>
 <p>… that is more concise, but not that different from checking the DB state inside the application code.</p>
 <p><a href="http://www.the-art-of-web.com/sql/upsert/">see</a></p>
 

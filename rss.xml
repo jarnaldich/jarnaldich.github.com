@@ -7,8 +7,184 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Tue, 02 Oct 2018 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Sat, 29 Feb 2020 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Optimizing Geospatial Workloads</title>
+    <link>http://jarnaldich.me/blog/2020/02/29/optimizing-geospatial-workloads.html</link>
+    <description><![CDATA[<h1>Optimizing Geospatial Workloads</h1>
+
+<small>Posted on February 29, 2020 <a href="/blog/2020/02/29/optimizing-geospatial-workloads.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>Large area geospatial processing often involves splitting into smaller working tiles to be processed or downloaded independently. As an example, 25cm resolution orthophoto production in Catalonia is divided into 4275 rectangular tiles, as seen in the following image.</p>
+<figure>
+<img src="/images/tiles5k.png" title="Orthophoto Tiling" class="center" alt="" /><figcaption> </figcaption>
+</figure>
+<p>Whenever a process can be applied to those tiles independently (ie, not depending on their neighborhood), parallel processing is an easy way to increase the throughput. In such environments, the total workload has to be distributed among a fixed, often limited, number of processing units (be they cores or computers). If the scheduling mechanism requires a predefined batch to be assigned to each core (or if there is no scheduling mechanism at all), and when the processing units are of similar processing power, then the maximum speedup is attained when all batches have an equal amount of tiles.</p>
+<p>Furthermore, since the result often has to be mosaicked in order to inspect it, or to aggregate it into a larger final product, it is desireable for the different batches to keep a spatial continuity, ideally conforming axis parallel rectangles, since that is the basic form of georeference for geospatial imagery once projected.</p>
+<h2 id="the-problem">The problem</h2>
+<p>This is a discrete optimization problem, which can be solved using the regular machinery. Since I have been dusting off my <a href="https://www.minizinc.org">MiniZinc</a> abilities through Coursera’s discrete optimization series, I decided to give it a go.</p>
+<h3 id="tile-scheme-representation">Tile scheme representation</h3>
+<p>For convenience, the list of valid tiles can be read from an external <code>.dzn</code> data file.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb1-1"><a href="#cb1-1"></a>ntiles = <span class="fl">4275</span>;</span>
+<span id="cb1-2"><a href="#cb1-2"></a>Tiles  = [| <span class="fl">253</span>, <span class="fl">055</span></span>
+<span id="cb1-3"><a href="#cb1-3"></a>          | <span class="fl">254</span>, <span class="fl">055</span></span>
+<span id="cb1-4"><a href="#cb1-4"></a>          | <span class="fl">253</span>, <span class="fl">056</span></span>
+<span id="cb1-5"><a href="#cb1-5"></a>          | <span class="fl">254</span>, <span class="fl">056</span></span>
+<span id="cb1-6"><a href="#cb1-6"></a>          | <span class="fl">255</span>, <span class="fl">055</span></span>
+<span id="cb1-7"><a href="#cb1-7"></a>          | <span class="fl">255</span>, <span class="fl">056</span></span>
+<span id="cb1-8"><a href="#cb1-8"></a>          | <span class="fl">256</span>, <span class="fl">056</span></span>
+<span id="cb1-9"><a href="#cb1-9"></a>          | <span class="fl">257</span>, <span class="fl">056</span></span>
+<span id="cb1-10"><a href="#cb1-10"></a>          | <span class="fl">252</span>, <span class="fl">059</span></span>
+<span id="cb1-11"><a href="#cb1-11"></a>          …</span>
+<span id="cb1-12"><a href="#cb1-12"></a>          |];</span></code></pre></div>
+<p>The above basically declares the list of valid tiles as a 2d array with <code>ntiles</code> rows and 2 columns. Then, in our model file (<code>.mzn</code>) the data will be loaded into the <code>Tiles</code> constant array, declared as follows:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">int</span>: ntiles;</span>
+<span id="cb2-2"><a href="#cb2-2"></a></span>
+<span id="cb2-3"><a href="#cb2-3"></a><span class="kw">enum</span> e_tile = { col, row };</span>
+<span id="cb2-4"><a href="#cb2-4"></a><span class="kw">array</span>[<span class="fl">1</span>..ntiles, e_tile ] <span class="kw">of</span> <span class="kw">int</span>: Tiles;</span></code></pre></div>
+<p>Notice the use of a column enum to make access easier.</p>
+<p>From the above data, a 2d grid can be built within the bounds of minimum and maximum columns, where the grid value is <code>true</code> if there exists a tile in that position, and <code>false</code> otherwise. This builds a nice representation for modelling the spatial restrictions in the problem.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">int</span>: mincol = <span class="kw">min</span>([ Tiles[i, ocol] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">int</span>: maxcol = <span class="kw">max</span>([ Tiles[i, ocol] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">int</span>: minrow = <span class="kw">min</span>([ Tiles[i, orow] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-4"><a href="#cb3-4"></a><span class="kw">int</span>: maxrow = <span class="kw">max</span>([ Tiles[i, orow] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-5"><a href="#cb3-5"></a></span>
+<span id="cb3-6"><a href="#cb3-6"></a><span class="kw">array</span>[minrow..maxrow, mincol..maxcol] <span class="kw">of</span> <span class="kw">int</span>: Grid =</span>
+<span id="cb3-7"><a href="#cb3-7"></a>  <span class="kw">array2d</span>(minrow..maxrow, mincol..maxcol,</span>
+<span id="cb3-8"><a href="#cb3-8"></a>     [ <span class="cf">exists</span>(i <span class="kw">in</span> <span class="fl">1</span>..ntiles)(Tiles[i, orow] == r /\ Tiles[i, ocol] == c)</span>
+<span id="cb3-9"><a href="#cb3-9"></a>       | r <span class="kw">in</span> minrow..maxrow, c <span class="kw">in</span> mincol..maxcol ]);</span></code></pre></div>
+<p>Note that all this is computed at compile time, before the actual optimization begins.</p>
+<h3 id="box-representation">Box representation</h3>
+<p>Boxes are rectangles defined defined by their left, bottom and top bounds:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">int</span>: nboxes;</span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="kw">enum</span> e_bbox  = { top, left, bottom, right };</span>
+<span id="cb4-3"><a href="#cb4-3"></a><span class="kw">array</span>[<span class="fl">1</span>..nboxes, e_bbox] <span class="kw">of</span> <span class="kw">var</span> <span class="kw">int</span>: Boxes;</span></code></pre></div>
+<p>Grid positions increase like in a matrix (first row top, left column first), and their bounds are constrained within the tile grid limits. Limits are inclusive. These requirements can be expressed as a minizinc <code>constraint</code>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb5-1"><a href="#cb5-1"></a><span class="kw">constraint</span></span>
+<span id="cb5-2"><a href="#cb5-2"></a>  forall(b <span class="kw">in</span> <span class="fl">1</span>..nboxes) (</span>
+<span id="cb5-3"><a href="#cb5-3"></a>      mincol &lt;= Boxes[b, left] /\ Boxes[b, left]  &lt;= maxcol /\</span>
+<span id="cb5-4"><a href="#cb5-4"></a>      minrow &lt;= Boxes[b, top] /\ Boxes[b, top] &lt;= maxcol /\</span>
+<span id="cb5-5"><a href="#cb5-5"></a>      Boxes[b, left] &lt;= Boxes[b, right] /\</span>
+<span id="cb5-6"><a href="#cb5-6"></a>      Boxes[b, top] &lt;= Boxes[b, bottom]);</span></code></pre></div>
+<p>Each tile belongs to just one box, so boxes do not overlap.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb6-1"><a href="#cb6-1"></a><span class="kw">predicate</span> no_overlap(<span class="kw">var</span> <span class="kw">int</span>:l1, <span class="kw">var</span> <span class="kw">int</span>:t1, <span class="kw">var</span> <span class="kw">int</span>:b1, <span class="kw">var</span> <span class="kw">int</span>:r1,</span>
+<span id="cb6-2"><a href="#cb6-2"></a>                     <span class="kw">var</span> <span class="kw">int</span>:l2, <span class="kw">var</span> <span class="kw">int</span>:t2, <span class="kw">var</span> <span class="kw">int</span>:b2, <span class="kw">var</span> <span class="kw">int</span>:r2) =</span>
+<span id="cb6-3"><a href="#cb6-3"></a>   r1 &lt; l2 \/ l1 &gt; r2 \/ b1 &lt; t2 \/ t1 &gt; b2 \/</span>
+<span id="cb6-4"><a href="#cb6-4"></a>   r2 &lt; l1 \/ l2 &gt; r1 \/ b2 &lt; t1 \/ t2 &gt; b1;</span>
+<span id="cb6-5"><a href="#cb6-5"></a></span>
+<span id="cb6-6"><a href="#cb6-6"></a><span class="kw">constraint</span> </span>
+<span id="cb6-7"><a href="#cb6-7"></a>forall(b1,b2 <span class="kw">in</span> <span class="fl">1</span>..nboxes where b1 &lt; b2) (</span>
+<span id="cb6-8"><a href="#cb6-8"></a>    no_overlap(</span>
+<span id="cb6-9"><a href="#cb6-9"></a>     	Boxes[b1, left], Boxes[b1, top], Boxes[b1, bottom], Boxes[b1, right],</span>
+<span id="cb6-10"><a href="#cb6-10"></a>	    Boxes[b2, left], Boxes[b2, top], Boxes[b2, bottom], Boxes[b2, right]));</span></code></pre></div>
+<h3 id="assignment">Assignment</h3>
+<p>In the end we want an array relating every tile with its box. Since we chose to represent a tile by its row and column, this can be modeled as a 2d array of <code>nboxes</code>. We will reserve a special 0 value for the empty tiles within the grid.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb7-1"><a href="#cb7-1"></a><span class="kw">array</span>[minrow..maxrow, mincol..maxcol] <span class="kw">of</span> <span class="kw">var</span> <span class="fl">0</span>..nboxes: Assignment;</span></code></pre></div>
+<p>The rules that relate the tile Grid with the Boxes and Assignment vector can be enumerated as follows:</p>
+<ol type="1">
+<li>Every tile inside the range of a box is assigned to it.</li>
+<li>Tiles not present are not assigned.</li>
+<li>Tiles not assigned to a box, but present, are assigned to another box.</li>
+</ol>
+<div class="sourceCode" id="cb8"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb8-1"><a href="#cb8-1"></a><span class="kw">constraint</span></span>
+<span id="cb8-2"><a href="#cb8-2"></a>  forall(b <span class="kw">in</span> <span class="fl">1</span>..nboxes) (</span>
+<span id="cb8-3"><a href="#cb8-3"></a>      forall(r <span class="kw">in</span> minrow..maxrow) (</span>
+<span id="cb8-4"><a href="#cb8-4"></a>          forall(c <span class="kw">in</span> mincol..maxcol) (</span>
+<span id="cb8-5"><a href="#cb8-5"></a>            if Grid[r,c] &gt; <span class="fl">0</span> then</span>
+<span id="cb8-6"><a href="#cb8-6"></a>              if contains(Boxes[b, left], Boxes[b, top],</span>
+<span id="cb8-7"><a href="#cb8-7"></a>                          Boxes[b, bottom], Boxes[b, right],</span>
+<span id="cb8-8"><a href="#cb8-8"></a>                          r, c)Ti</span>
+<span id="cb8-9"><a href="#cb8-9"></a>              then</span>
+<span id="cb8-10"><a href="#cb8-10"></a>                <span class="co">% 1 - Tiles within the range of a box are assigned to it</span></span>
+<span id="cb8-11"><a href="#cb8-11"></a>                Assignment[r,c] = b</span>
+<span id="cb8-12"><a href="#cb8-12"></a>              else</span>
+<span id="cb8-13"><a href="#cb8-13"></a>                <span class="co">% 3 - Tiles not assigned to a box are assigned to another</span></span>
+<span id="cb8-14"><a href="#cb8-14"></a>                Assignment[r,c] != b /\ Assignment[r,c] &gt; <span class="fl">0</span></span>
+<span id="cb8-15"><a href="#cb8-15"></a>              endif</span>
+<span id="cb8-16"><a href="#cb8-16"></a>            else</span>
+<span id="cb8-17"><a href="#cb8-17"></a>              <span class="co">% 2 - Tiles not present are not assigned</span></span>
+<span id="cb8-18"><a href="#cb8-18"></a>              Assignment[r,c] = <span class="fl">0</span></span>
+<span id="cb8-19"><a href="#cb8-19"></a>            endif)));</span></code></pre></div>
+<h3 id="objective-function">Objective function</h3>
+<p>We want to make the resulting rectangles as equal as possible. In order to do so, we have to gather the cardinalities of each box.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb9-1"><a href="#cb9-1"></a><span class="kw">array</span>[<span class="fl">1</span>..nboxes] <span class="kw">of</span> <span class="kw">var</span> <span class="kw">int</span>: BoxCardinality =</span>
+<span id="cb9-2"><a href="#cb9-2"></a>  [ sum(r <span class="kw">in</span> minrow..maxrow, c <span class="kw">in</span> mincol..maxcol)(Grid[r,c] &gt; <span class="fl">0</span> /\ Assignment[r,c] == b) | b <span class="kw">in</span> <span class="fl">1</span>..nboxes];</span></code></pre></div>
+<p>This can be done by minimizing the variance, which is the same as minimizing the square L2 norm (dot product of a vector with itself).</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb10-1"><a href="#cb10-1"></a><span class="kw">var</span> <span class="kw">int</span>: variance = sum(b <span class="kw">in</span> <span class="fl">1</span>..nboxes)(BoxCardinality[b]*BoxCardinality[b]);</span>
+<span id="cb10-2"><a href="#cb10-2"></a>solve minimize variance;</span></code></pre></div>
+<h3 id="showing-the-results">Showing the results</h3>
+<p>It is useful to dump the result in some format that can be easily parsed by standard command-line tools, since some models have to be further processed. In this case, the lines corresponding to the assignment vector are prefixed with the tag <code>Tiles</code> to make them easy to redirect to another file.</p>
+<p>The printing itself can be done with a combination of helper functions and array comprehensions.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb11-1"><a href="#cb11-1"></a>function string: show_assignment(<span class="kw">int</span>: r, <span class="kw">int</span>: c) = &quot;Tile: &quot; ++ show(c) ++ &quot;-&quot; ++ show(r) ++ &quot;,&quot; ++ show(Assignment[r,c]) ++ &quot;\n&quot;;</span>
+<span id="cb11-2"><a href="#cb11-2"></a></span>
+<span id="cb11-3"><a href="#cb11-3"></a>output </span>
+<span id="cb11-4"><a href="#cb11-4"></a>  [ show_assignment(r,c) | r <span class="kw">in</span> minrow..maxrow, c <span class="kw">in</span> mincol..maxcol where Grid[r,c] &gt; <span class="fl">0</span> ] ++ </span>
+<span id="cb11-5"><a href="#cb11-5"></a>  [ &quot;Variance: &quot;, show(variance), &quot;\n&quot;,</span>
+<span id="cb11-6"><a href="#cb11-6"></a>    &quot;Box Cardinalities: &quot;,  show(BoxCardinality) , &quot;\n&quot; ];</span></code></pre></div>
+<p>For powershell users, this could be captured, for example:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb12-1"><a href="#cb12-1"></a><span class="va">$ENV</span>:FLATZINC_CMD = <span class="st">&quot;fzn-gecode&quot;</span></span>
+<span id="cb12-2"><a href="#cb12-2"></a><span class="va">$Env</span>:PATH += <span class="st">&quot;;D:\Soft\MiniZinc\&quot;</span></span>
+<span id="cb12-3"><a href="#cb12-3"></a>minizinc.<span class="fu">exe</span> -I D:\Soft\MiniZinc\share\minizinc\gecode\ .\tall5m.<span class="fu">mzn</span> .\tall5m.<span class="fu">dzn</span> | ? { <span class="va">$_</span> -match <span class="st">&quot;Ortho: &quot;</span> } | % { <span class="va">$_</span> -replace <span class="st">&quot;Ortho: &quot;</span> } | <span class="fu">out-file</span> -encoding ascii assign5.<span class="fu">csv</span></span></code></pre></div>
+<h3 id="not-so-fast">Not so fast!</h3>
+<p>For big grids, the process is too slow (on my hardware, ymmv). A practical way to mitigate that problem is including further “artificial” restrictions that capture some common-sense knowledge. Here we can set that box cardinalities belong to an environment around a <em>perfect</em> one, which would happen when every box has <code>ntiles / nboxes</code> tiles.</p>
+<p>We can define a parameter <code>slack</code>, that will represent the radius of the environment, and add the following constraint:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb13-1"><a href="#cb13-1"></a><span class="co">% All boxes have at least one tile assigned to it</span></span>
+<span id="cb13-2"><a href="#cb13-2"></a><span class="kw">float</span>: fill_factor = (ntiles / nboxes);</span>
+<span id="cb13-3"><a href="#cb13-3"></a></span>
+<span id="cb13-4"><a href="#cb13-4"></a><span class="kw">constraint</span></span>
+<span id="cb13-5"><a href="#cb13-5"></a>   forall(b <span class="kw">in</span> <span class="fl">1</span>..nboxes) ( (<span class="fl">1.0</span> - slack)*fill_factor &lt;= BoxCardinality[b] /\ BoxCardinality[b] &lt;= (<span class="fl">1.0</span> + slack)*fill_factor ) ; </span></code></pre></div>
+<p>This is common in discrete optimization problems, where a hybrid system can be developed. In this case, we could use some sort of search to optimize for the value of the slack, with different invocations of minizinc.</p>
+<h2 id="results">Results</h2>
+<p>By processing the results of minizinc and joining the results into a <a href="https://www.qgis.org">QGis</a> project, we can easily map the box assignment. Here is the result for 4 boxes:</p>
+<p><img src="/images/tiles5k_colored.png" title="Orthophoto Tiling" class="center" /></p>
+<p>For 8 boxes (8 parallel processors), the result would be:</p>
+<p><img src="/images/tiles5k_8box_colored.png" title="Orthophoto Tiling" class="center" /></p>
+<h2 id="conclusions">Conclusions</h2>
+<p>Even when I know the basic theory behind mixed integer and fp solvers (even implemented a simplex-based solver as a practical exercise in the past), I keep having the feeling there is some form of magic at work here.</p>
+<p>There are lots of other ways to model this problem. In particular, MiniZinc has special primitives for dealing with sets. Some of the restriction explicitly stated by the model are already available for reuse in the <code>globals</code> library, which would probably more efficient and would lead to terser code. I would like to rewrite the model using these functions and compare their efficiency if I ever have the time.</p>
+<p>For now, I got my results!</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/geospatial.html">geospatial</a>, <a href="/tags/minizinc.html">minizinc</a>, <a href="/tags/optimization.html">optimization</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2020/02/29/optimizing-geospatial-workloads.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+]]></description>
+    <pubDate>Sat, 29 Feb 2020 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2020/02/29/optimizing-geospatial-workloads.html</guid>
+    <dc:creator>Joan Arnaldich</dc:creator>
+</item>
+<item>
     <title>Foreign Data Wrappers for Data Synchronization</title>
     <link>http://jarnaldich.me/blog/2018/10/02/fdw-sync.html</link>
     <description><![CDATA[<h1>Foreign Data Wrappers for Data Synchronization</h1>
@@ -16,7 +192,7 @@
 <small>Posted on October  2, 2018 <a href="/blog/2018/10/02/fdw-sync.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <p>The <a href="http://www.postgresqltutorial.com/postgresql-copy-database/">standard way</a> of copying databases (or just tables) between PostgreSQL servers seems to be through backup (with its many options). This article describes another way that I have been using lately using foreign data wrappers. The two servers need to be able to connect to each other (albeit only during the synchronization time), it does not need shell access to any of them and avoids generating intermediate files. The steps involved are:</p>
-<ol style="list-style-type: decimal">
+<ol type="1">
 <li>Install the foreign data wrapper extension for your database (just once in the target server).</li>
 <li>Setup the foreign server connection from in the target server pointing to the source server.</li>
 <li>Setup a user mapping.</li>
@@ -26,31 +202,31 @@
 <h2 id="install-the-foreign-data-wrapper">Install the Foreign Data Wrapper</h2>
 <p><a href="https://wiki.postgresql.org/wiki/Foreign_data_wrappers">Foreign Data Wrappers</a> are a mechanism that allow presenting external data sources as PostgreSQL tables. Note that it is not limited to foreign PostgreSQL databases: there are foreign data wrappers for other DB servers and other sources of data, including CSV files and even Twitter streams. Once the data is presented into Postgres, all the power of SQL becomes available for your data, so they are quite a feature for data management and integration.</p>
 <p>FDWs are installed as extensions for every kind of data source. Of course there is one FDW for connecting to external PostgreSQL databases in the standard distribution:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> EXTENSION postgres_fdw;</code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">CREATE</span> EXTENSION postgres_fdw;</span></code></pre></div>
 <h2 id="creating-the-server">Creating the server</h2>
 <p>Once the extension is installed, the remote server needs to be set up:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> SERVER remote_server
-  <span class="kw">FOREIGN</span> <span class="kw">DATA</span> WRAPPER postgres_fdw
-  OPTIONS (host <span class="st">&#39;host_or_ip&#39;</span>, dbname <span class="st">&#39;db_name&#39;</span>);</code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">CREATE</span> SERVER remote_server</span>
+<span id="cb2-2"><a href="#cb2-2"></a>  <span class="kw">FOREIGN</span> <span class="kw">DATA</span> WRAPPER postgres_fdw</span>
+<span id="cb2-3"><a href="#cb2-3"></a>  OPTIONS (host <span class="st">&#39;host_or_ip&#39;</span>, dbname <span class="st">&#39;db_name&#39;</span>);</span></code></pre></div>
 <h2 id="creating-the-user-mapping">Creating the user mapping</h2>
 <p>In order to allow for a greater flexibility in terms of permissions, the remote server needs a user mapping, wich will map users between the source and target servers. For every mapped user, the following sentence should be used:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> <span class="fu">USER</span> MAPPING <span class="kw">FOR</span> postgres SERVER perry
-    OPTIONS (<span class="kw">password</span> <span class="st">&#39;pwd&#39;</span>, <span class="ot">&quot;user&quot;</span> <span class="st">&#39;postgres&#39;</span>);</code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">CREATE</span> <span class="fu">USER</span> MAPPING <span class="cf">FOR</span> postgres SERVER perry</span>
+<span id="cb3-2"><a href="#cb3-2"></a>    OPTIONS (<span class="kw">password</span> <span class="st">&#39;pwd&#39;</span>, <span class="ot">&quot;user&quot;</span> <span class="st">&#39;postgres&#39;</span>);</span></code></pre></div>
 <h2 id="create-the-foreign-tables">Create the foreign tables</h2>
 <p>Once the database and server are linked, we can start creating the foreign tables. Notice that foreign tables are just “proxies” for the external tables (think of them as symlinks in the file system or pointers in a programming language). That means creating them is just a matter of defining their structure, no data is transferred, and hence should be fast. The downside is that the description for the foreign tables has to be written in the target server (much like writing the table create script).</p>
 <p>In order to make the process easier, PostgreSQL has a command that will just import the foreign structure through:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql">IMPORT <span class="kw">FOREIGN</span> <span class="kw">SCHEMA</span> source_schema <span class="kw">FROM</span> SERVER source_server <span class="kw">INTO</span> proxy_schema;</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1"></a>IMPORT <span class="kw">FOREIGN</span> <span class="kw">SCHEMA</span> source_schema <span class="kw">FROM</span> SERVER source_server <span class="kw">INTO</span> proxy_schema;</span></code></pre></div>
 <p>If you just want to import some tables of the schema, you can use:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql">IMPORT <span class="kw">FOREIGN</span> <span class="kw">SCHEMA</span> <span class="kw">public</span> <span class="kw">LIMIT</span> <span class="kw">TO</span> 
-( table1, table2 )
-<span class="kw">FROM</span> SERVER source_server <span class="kw">INTO</span> proxy_schema;</code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1"></a>IMPORT <span class="kw">FOREIGN</span> <span class="kw">SCHEMA</span> <span class="kw">public</span> <span class="kw">LIMIT</span> <span class="kw">TO</span> </span>
+<span id="cb5-2"><a href="#cb5-2"></a>( table1, table2 )</span>
+<span id="cb5-3"><a href="#cb5-3"></a><span class="kw">FROM</span> SERVER source_server <span class="kw">INTO</span> proxy_schema;</span></code></pre></div>
 <p>Just refer to the [documentation] for other options.</p>
 <p>You can verify that the tables have been imported typing <code>\det</code> inside the <code>psql</code> cli.</p>
 <h2 id="instantiate-materialized-views">Instantiate materialized views</h2>
 <p>As stated before, foreign tables are just a proxy for the real data. In order to be able to work independently of the source server, actual data needs to be copied. The easiest way to do so in order to be able to update the data is through materialized views. You can think of them as new tables with a refresh mechanism. In particular, that means that the original indices over the data will be lost, so new indices should be created.</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> <span class="kw">MATERIALIZED</span> <span class="kw">VIEW</span> view_name <span class="kw">AS</span> <span class="kw">SELECT</span> * <span class="kw">FROM</span> proxy_schema.table_name;</code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1"></a><span class="kw">CREATE</span> <span class="kw">MATERIALIZED</span> <span class="kw">VIEW</span> view_name <span class="kw">AS</span> <span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> proxy_schema.table_name;</span></code></pre></div>
 <p>Whenever the data needs to be refreshed, just:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">REFRESH</span> <span class="kw">MATERIALIZED</span> <span class="kw">VIEW</span> view_name;</code></pre>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1"></a><span class="kw">REFRESH</span> <span class="kw">MATERIALIZED</span> <span class="kw">VIEW</span> view_name;</span></code></pre></div>
 <h2 id="in-the-command-line-client">In the command-line client</h2>
 <p>The following commands might be useful if you use the <code>psql</code> client&gt;</p>
 <ul>
@@ -62,24 +238,24 @@
 </ul>
 <h2 id="helper-function">Helper function</h2>
 <p>Depending on how many tables you wish to import, something along the following anonymous code block might be useful. It just creates the materialized views and indices, but it can be adapted to whatever is needed.</p>
-<pre class="sourceCode sql"><code class="sourceCode sql">DO $$
-<span class="kw">DECLARE</span> r <span class="dt">record</span>;
-<span class="kw">BEGIN</span>
-    <span class="kw">FOR</span> r <span class="kw">IN</span> <span class="kw">SELECT</span> tname <span class="kw">FROM</span> (<span class="kw">VALUES</span> 
-            (<span class="st">&#39;table1&#39;</span>),
-            (<span class="st">&#39;table2&#39;</span>), 
-            (<span class="st">&#39;...&#39;</span>), 
-            (<span class="st">&#39;tableN&#39;</span>)) <span class="kw">AS</span> x(tname)
-    <span class="kw">LOOP</span>
-        <span class="co">-- SQL automatically concatenates strings if there is a line separator in between</span>
-        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE MATERIALIZED VIEW IF NOT EXISTS %s AS &#39;</span>
-            <span class="st">&#39;SELECT * FROM proxy_schema.%s&#39;</span>,
-             r.tname, r.tname);
-        <span class="co">-- Index by geometry (Postgis), just an example</span>
-        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE INDEX IF NOT EXISTS sidx_%s ON %s USING GIST (geom)&#39;</span>,
-             r.tname, r.tname);
-    <span class="kw">END</span> <span class="kw">LOOP</span>;
-END$$</code></pre>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1"></a>DO $$</span>
+<span id="cb8-2"><a href="#cb8-2"></a><span class="kw">DECLARE</span> r <span class="dt">record</span>;</span>
+<span id="cb8-3"><a href="#cb8-3"></a><span class="cf">BEGIN</span></span>
+<span id="cb8-4"><a href="#cb8-4"></a>    <span class="cf">FOR</span> r <span class="kw">IN</span> <span class="kw">SELECT</span> tname <span class="kw">FROM</span> (<span class="kw">VALUES</span> </span>
+<span id="cb8-5"><a href="#cb8-5"></a>            (<span class="st">&#39;table1&#39;</span>),</span>
+<span id="cb8-6"><a href="#cb8-6"></a>            (<span class="st">&#39;table2&#39;</span>), </span>
+<span id="cb8-7"><a href="#cb8-7"></a>            (<span class="st">&#39;...&#39;</span>), </span>
+<span id="cb8-8"><a href="#cb8-8"></a>            (<span class="st">&#39;tableN&#39;</span>)) <span class="kw">AS</span> x(tname)</span>
+<span id="cb8-9"><a href="#cb8-9"></a>    <span class="cf">LOOP</span></span>
+<span id="cb8-10"><a href="#cb8-10"></a>        <span class="co">-- SQL automatically concatenates strings if there is a line separator in between</span></span>
+<span id="cb8-11"><a href="#cb8-11"></a>        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE MATERIALIZED VIEW IF NOT EXISTS %s AS &#39;</span></span>
+<span id="cb8-12"><a href="#cb8-12"></a>            <span class="st">&#39;SELECT * FROM proxy_schema.%s&#39;</span>,</span>
+<span id="cb8-13"><a href="#cb8-13"></a>             r.tname, r.tname);</span>
+<span id="cb8-14"><a href="#cb8-14"></a>        <span class="co">-- Index by geometry (Postgis), just an example</span></span>
+<span id="cb8-15"><a href="#cb8-15"></a>        <span class="kw">EXECUTE</span> format(<span class="st">&#39;CREATE INDEX IF NOT EXISTS sidx_%s ON %s USING GIST (geom)&#39;</span>,</span>
+<span id="cb8-16"><a href="#cb8-16"></a>             r.tname, r.tname);</span>
+<span id="cb8-17"><a href="#cb8-17"></a>    <span class="cf">END</span> <span class="cf">LOOP</span>;</span>
+<span id="cb8-18"><a href="#cb8-18"></a>END$$</span></code></pre></div>
 <h2 id="conclusion-and-final-warnings">Conclusion and final warnings</h2>
 <p>This method can be convenient if data has to be synced frequently, as it just boils down to refreshing the materialized view. This can also be used from within other pgplsql functions, and needs no external tools (apart from a client) or intermediate files.</p>
 <p>It is not for every situation, though. In particular, <em>the data in materialized views are not backed up</em> (<code>psql</code> generates the view create script and performs a <code>REFRESH</code>). That means that if the original server is unavailable at restore time, data will be lost. This can be avoided by using regular <em>proxy</em> tables instead of materialized views.</p>
@@ -145,35 +321,34 @@ END$$</code></pre>
 <h1 id="the-task">The Task</h1>
 <p>A quick and dirty way to monitor the progress of a batch process is probing the number of output files in a directory at regular intervals and maybe save that to a file eg. for plotting, statistics, etc…</p>
 <p>It is quite probable that a developer would come up with a solution very much like the function below:</p>
-<pre class="powershell"><code>function Sample-Count-Files {
-    [CmdletBinding()]
-
-    param(
-        # The file pattern to count
-        [Parameter(Mandatory=$true, 
-                   Position=0)]
-        [string]$pattern,
-
-        # Name of the log file
-        [Parameter(Mandatory=$true, 
-            Position=1)]
-        [string]$logfile,
-
-        # Seconds interval between samples
-        [Parameter(Mandatory=$true, 
-            Position=2)]
-        [int]$seconds)
-
-    While($true) {
-        sleep $seconds;
-        $cnt = (dir $pattern).Count;
-        $d = Get-Date;
-        $d.ToString(&quot;yyyy-MM-dd HH:mm:ss&quot;) + &quot;`t$cnt&quot; | Out-File $logfile -encoding ascii -Append -ob 0
-    }
-}
-</code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">function</span> Sample-Count-Files {</span>
+<span id="cb1-2"><a href="#cb1-2"></a>    [CmdletBinding()]</span>
+<span id="cb1-3"><a href="#cb1-3"></a></span>
+<span id="cb1-4"><a href="#cb1-4"></a>    <span class="kw">param</span>(</span>
+<span id="cb1-5"><a href="#cb1-5"></a>        <span class="co"># The file pattern to count</span></span>
+<span id="cb1-6"><a href="#cb1-6"></a>        [Parameter(Mandatory=<span class="va">$true</span>, </span>
+<span id="cb1-7"><a href="#cb1-7"></a>                   Position=0)]</span>
+<span id="cb1-8"><a href="#cb1-8"></a>        [<span class="dt">string</span>]<span class="va">$pattern</span>,</span>
+<span id="cb1-9"><a href="#cb1-9"></a></span>
+<span id="cb1-10"><a href="#cb1-10"></a>        <span class="co"># Name of the log file</span></span>
+<span id="cb1-11"><a href="#cb1-11"></a>        [Parameter(Mandatory=<span class="va">$true</span>, </span>
+<span id="cb1-12"><a href="#cb1-12"></a>            Position=1)]</span>
+<span id="cb1-13"><a href="#cb1-13"></a>        [<span class="dt">string</span>]<span class="va">$logfile</span>,</span>
+<span id="cb1-14"><a href="#cb1-14"></a></span>
+<span id="cb1-15"><a href="#cb1-15"></a>        <span class="co"># Seconds interval between samples</span></span>
+<span id="cb1-16"><a href="#cb1-16"></a>        [Parameter(Mandatory=<span class="va">$true</span>, </span>
+<span id="cb1-17"><a href="#cb1-17"></a>            Position=2)]</span>
+<span id="cb1-18"><a href="#cb1-18"></a>        [<span class="dt">int</span>]<span class="va">$seconds</span>)</span>
+<span id="cb1-19"><a href="#cb1-19"></a></span>
+<span id="cb1-20"><a href="#cb1-20"></a>    <span class="kw">While</span>(<span class="va">$true</span>) {</span>
+<span id="cb1-21"><a href="#cb1-21"></a>        <span class="fu">sleep</span> <span class="va">$seconds</span>;</span>
+<span id="cb1-22"><a href="#cb1-22"></a>        <span class="va">$cnt</span> = (<span class="fu">dir</span> <span class="va">$pattern</span>).<span class="fu">Count</span>;</span>
+<span id="cb1-23"><a href="#cb1-23"></a>        <span class="va">$d</span> = <span class="fu">Get-Date</span>;</span>
+<span id="cb1-24"><a href="#cb1-24"></a>        <span class="va">$d</span>.<span class="fu">ToString</span>(<span class="st">&quot;yyyy-MM-dd HH:mm:ss&quot;</span>) + <span class="st">&quot;`t$cnt&quot;</span> | <span class="fu">Out-File</span> <span class="va">$logfile</span> -encoding ascii -Append -ob 0</span>
+<span id="cb1-25"><a href="#cb1-25"></a>    }</span>
+<span id="cb1-26"><a href="#cb1-26"></a>}</span></code></pre></div>
 <p>That is, an infinte loop which waits for a number of seconds before counting the output files and outputting a line with the date and result. Executing the above code will block the console, so to monitor progress you can always wrap it into a <code>PSJob</code> or open a new console and then just tail the file:</p>
-<pre class="powershell"><code>gc -tail 10 -Wait samples.tsv</code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb2-1"><a href="#cb2-1"></a><span class="fu">gc</span> -tail 10 -Wait samples.<span class="fu">tsv</span></span></code></pre></div>
 <p>I suspect most developers that have not dealt with Unix scripting would come up with something along the lines of this. Conversely, my bet is any experienced Unix scripter would frown upon it, feeling the script is trying to do <em>too much</em>. In particular, it is in charge of:</p>
 <ul>
 <li><strong>The When</strong>: The counting is done every <em>n</em> seconds.</li>
@@ -182,41 +357,40 @@ END$$</code></pre>
 </ul>
 <p>These three pieces of functionality are coupled in our function, and they would’nt need to be so. For example, separating the <em>when</em> from the <em>what</em> would allow us to fire <em>any action</em> every <em>n</em> seconds.</p>
 <p>This is indeed not difficult in PowerShell, see:</p>
-<pre class="powershell"><code>function Tick {
-    [CmdletBinding()]
-    Param([Parameter(Mandatory=$true, Position=0)][int]$Seconds)
-    Process {
-        while($true) { 
-            Start-Sleep -Seconds $Seconds
-            Get-Date
-        }    
-    }
-}</code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">function</span> Tick {</span>
+<span id="cb3-2"><a href="#cb3-2"></a>    [CmdletBinding()]</span>
+<span id="cb3-3"><a href="#cb3-3"></a>    <span class="kw">Param</span>([Parameter(Mandatory=<span class="va">$true</span>, Position=0)][<span class="dt">int</span>]<span class="va">$Seconds</span>)</span>
+<span id="cb3-4"><a href="#cb3-4"></a>    <span class="kw">Process</span> {</span>
+<span id="cb3-5"><a href="#cb3-5"></a>        <span class="kw">while</span>(<span class="va">$true</span>) { </span>
+<span id="cb3-6"><a href="#cb3-6"></a>            <span class="fu">Start-Sleep</span> -Seconds <span class="va">$Seconds</span></span>
+<span id="cb3-7"><a href="#cb3-7"></a>            <span class="fu">Get-Date</span></span>
+<span id="cb3-8"><a href="#cb3-8"></a>        }    </span>
+<span id="cb3-9"><a href="#cb3-9"></a>    }</span>
+<span id="cb3-10"><a href="#cb3-10"></a>}</span></code></pre></div>
 <p>This <code>CmdLet</code> waits for a number of seconds before sending a <code>Date</code> object downstream to do whatever we please with it, and loops (mind it is inside the <code>Process</code> section). It is like a pulse generating objects at regular intervals, so now we can reuse the <em>when</em> in different contexts:</p>
-<pre class="powershell"><code>Tick 10 | % { $_ }</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb4-1"><a href="#cb4-1"></a>Tick 10 | % { <span class="va">$_</span> }</span></code></pre></div>
 <p>We can write a similar function for the <em>what</em>. In a real scenario we probably would just write a one-liner, because our code is so simple, but in this post we will go the full way. As a bonus, instead of working with strings, we demonstrate how to pass custom objects down the pipeline. Here, we create an object with two members: the time and the file count.</p>
-<pre class="powershell"><code>
-function Count {
-    [CmdletBinding()]
-    Param(
-    	[Parameter(Mandatory=$true, Position=0)]
-	    [string]
-	    $Pattern,
-
-        [Parameter(Mandatory=$true, Position=1, ValueFromPipeline=$true)]
-	    $Time
-    )
-
-    Process {
-        [PSCustomObject]@{ 
-           Time=$Time; 
-           Files= $(dir $Pattern).Count 
-        }
-    }
-}
-</code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb5-1"><a href="#cb5-1"></a></span>
+<span id="cb5-2"><a href="#cb5-2"></a><span class="kw">function</span> Count {</span>
+<span id="cb5-3"><a href="#cb5-3"></a>    [CmdletBinding()]</span>
+<span id="cb5-4"><a href="#cb5-4"></a>    <span class="kw">Param</span>(</span>
+<span id="cb5-5"><a href="#cb5-5"></a>    	[Parameter(Mandatory=<span class="va">$true</span>, Position=0)]</span>
+<span id="cb5-6"><a href="#cb5-6"></a>	    [<span class="dt">string</span>]</span>
+<span id="cb5-7"><a href="#cb5-7"></a>	    <span class="va">$Pattern</span>,</span>
+<span id="cb5-8"><a href="#cb5-8"></a></span>
+<span id="cb5-9"><a href="#cb5-9"></a>        [Parameter(Mandatory=<span class="va">$true</span>, Position=1, ValueFromPipeline=<span class="va">$true</span>)]</span>
+<span id="cb5-10"><a href="#cb5-10"></a>	    <span class="va">$Time</span></span>
+<span id="cb5-11"><a href="#cb5-11"></a>    )</span>
+<span id="cb5-12"><a href="#cb5-12"></a></span>
+<span id="cb5-13"><a href="#cb5-13"></a>    <span class="kw">Process</span> {</span>
+<span id="cb5-14"><a href="#cb5-14"></a>        [PSCustomObject]@{ </span>
+<span id="cb5-15"><a href="#cb5-15"></a>           Time=<span class="va">$Time</span>; </span>
+<span id="cb5-16"><a href="#cb5-16"></a>           Files= $(<span class="fu">dir</span> <span class="va">$Pattern</span>).<span class="fu">Count</span> </span>
+<span id="cb5-17"><a href="#cb5-17"></a>        }</span>
+<span id="cb5-18"><a href="#cb5-18"></a>    }</span>
+<span id="cb5-19"><a href="#cb5-19"></a>}</span></code></pre></div>
 <p>For the output, we could write our own function again, but it turns out there already is a Powershell function that formats objects into CSV files, conveniently named <code>Export-Csv</code>. Putting it all together:</p>
-<pre class="powershell"><code>Tick 1 -ob 0 | Count *.out | Export-Csv times.csv</code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb6-1"><a href="#cb6-1"></a>Tick 1 -ob 0 | Count *.<span class="fu">out</span> | <span class="fu">Export-Csv</span> times.<span class="fu">csv</span></span></code></pre></div>
 <p>Which is clean, easy to understand and easy to reuse, just like good <em>Unix</em> scripting is supposed to. By the way, if you are wondering where the <code>-ob 0</code> or <code>-ObjectBuffer 0</code> came from (we did not explicitly add it to our script), that is known as a <a href="https://msdn.microsoft.com/en-us/powershell/reference/5.1/microsoft.powershell.core/about/about_commonparameters">common parameter</a>. For efficiency reasons, Powershell can wait until a bunch of objects are accumulated into a buffer before sending them downstream. Obviously that is not what we want here, so we set the buffer size to 0.</p>
 <h2 id="conclusion">Conclusion</h2>
 <p>It is often a good idea, when approaching shell scripting, to take a step back and think whether we are trying to accomplish too much at once, and which pieces of functionality we would like to reuse in the future. That is not really different from the software architecture best practices applied when programming in the large, but the abstractions (programming whith pipes and streams) are. Now Windows programmers can apply the same principles at play in Unix for decades.</p>
@@ -277,7 +451,7 @@ function Count {
 <h2 id="what-is-it">What is it?</h2>
 <p>As its name suggests, it is something that combines the functionality of an insert and an update.</p>
 <p>Like when:</p>
-<ol style="list-style-type: decimal">
+<ol type="1">
 <li>You want to update a field of a record if it exists, or insert it with that field value if it does not.</li>
 <li>You have a process that inserts incrementally into a DB table, in which you may want to make sure that a certain record exists, and do not want to fail with a duplicate key error if it is already there (you are using the database as a <code>set</code> or <code>bag</code> data structure).</li>
 <li>A generalization of 1: you want to update a field of a record with a function of the old value (eg. incrementing), or assign it a default value if the record does not exist.</li>
@@ -285,45 +459,45 @@ function Count {
 <h2 id="ok.-how-can-i-do-this">Ok. How can I do this?</h2>
 <p>Well, first thing is to check your PostgreSQL version. Versions 9.5 will have this functionality built-in (as many other RDBMS do) through the use of the <code>INSERT ... ON CONFLICT</code> clause. See the <a href="https://wiki.postgresql.org/wiki/UPSERT">discussion</a>.</p>
 <p>At the time of writing this, 9.5 is not available, and anyway many of us are forced to work with legacy versions, so here I will discuss a couple of ways to achive this functionality. Notice that geting this right is not easy, since concurrency and transaction issues must be taken into account. In particular, doing this in your code:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">if</span> (<span class="kw">SELECT</span> whatever <span class="kw">to</span> <span class="kw">check</span> <span class="kw">if</span> <span class="dt">record</span> <span class="kw">exists</span>)
-    <span class="kw">UPDATE</span> it
-<span class="kw">else</span> 
-   <span class="kw">INSERT</span> IT</code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1"></a><span class="cf">if</span> (<span class="kw">SELECT</span> whatever <span class="kw">to</span> <span class="kw">check</span> <span class="cf">if</span> <span class="dt">record</span> <span class="kw">exists</span>)</span>
+<span id="cb1-2"><a href="#cb1-2"></a>    <span class="kw">UPDATE</span> it</span>
+<span id="cb1-3"><a href="#cb1-3"></a><span class="cf">else</span> </span>
+<span id="cb1-4"><a href="#cb1-4"></a>   <span class="kw">INSERT</span> IT</span></code></pre></div>
 <p>or alternatively,</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">if</span>(<span class="kw">UPDATE</span> affects one <span class="kw">or</span> more records) 
-  <span class="co">-- we&#39;re done</span>
-<span class="kw">else</span> 
-  <span class="kw">INSERT</span> <span class="dt">record</span>;</code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1"></a><span class="cf">if</span>(<span class="kw">UPDATE</span> affects one <span class="kw">or</span> more records) </span>
+<span id="cb2-2"><a href="#cb2-2"></a>  <span class="co">-- we&#39;re done</span></span>
+<span id="cb2-3"><a href="#cb2-3"></a><span class="cf">else</span> </span>
+<span id="cb2-4"><a href="#cb2-4"></a>  <span class="kw">INSERT</span> <span class="dt">record</span>;</span></code></pre></div>
 <p>Will not work even inside a transaction. The default isolation level for transactions will only guarantee that other connections do not see your intermediate changes and that all of your changes succed or fail at once. (That is, the A(tomic) and I(solated) in ACID). If two different transactions query the db concurrently for a new ID, they might both get the same ID, and the transaction will fail. Setting the transaction level to SERIALIZABLE would work (think of transactions running inside a mutual exclusion region), but the application code should be ready to retry the transaction.</p>
 <h2 id="the-general-solutions">The general solution(s)</h2>
 <p>So if you want a general solution that works for all of the 3 cases stated previously, you should probably write a stored procedure in the DB like the <a href="http://www.postgresql.org/docs/current/static/plpgsql-control-structures.html#PLPGSQL-UPSERT-EXAMPLE">documentation suggests</a>:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">CREATE</span> <span class="kw">TABLE</span> db (a <span class="dt">INT</span> <span class="kw">PRIMARY</span> <span class="kw">KEY</span>, b TEXT);
-
-<span class="kw">CREATE</span> <span class="kw">FUNCTION</span> merge_db(<span class="kw">key</span> <span class="dt">INT</span>, <span class="kw">data</span> TEXT) RETURNS VOID <span class="kw">AS</span>
-$$
-<span class="kw">BEGIN</span>
-    <span class="kw">LOOP</span>
-        <span class="co">-- first try to update the key</span>
-        <span class="kw">UPDATE</span> db <span class="kw">SET</span> b = <span class="kw">data</span> <span class="kw">WHERE</span> a = <span class="kw">key</span>;
-        <span class="kw">IF</span> found <span class="kw">THEN</span>
-            <span class="kw">RETURN</span>;
-        <span class="kw">END</span> <span class="kw">IF</span>;
-        <span class="co">-- not there, so try to insert the key</span>
-        <span class="co">-- if someone else inserts the same key concurrently,</span>
-        <span class="co">-- we could get a unique-key failure</span>
-        <span class="kw">BEGIN</span>
-            <span class="kw">INSERT</span> <span class="kw">INTO</span> db(a,b) <span class="kw">VALUES</span> (<span class="kw">key</span>, <span class="kw">data</span>);
-            <span class="kw">RETURN</span>;
-        <span class="kw">EXCEPTION</span> <span class="kw">WHEN</span> unique_violation <span class="kw">THEN</span>
-            <span class="co">-- Do nothing, and loop to try the UPDATE again.</span>
-        <span class="kw">END</span>;
-    <span class="kw">END</span> <span class="kw">LOOP</span>;
-<span class="kw">END</span>;
-$$
-LANGUAGE plpgsql;
-
-<span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;david&#39;</span>);
-<span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;dennis&#39;</span>);</code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> db (a <span class="dt">INT</span> <span class="kw">PRIMARY</span> <span class="kw">KEY</span>, b TEXT);</span>
+<span id="cb3-2"><a href="#cb3-2"></a></span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">CREATE</span> <span class="kw">FUNCTION</span> merge_db(<span class="kw">key</span> <span class="dt">INT</span>, <span class="kw">data</span> TEXT) RETURNS VOID <span class="kw">AS</span></span>
+<span id="cb3-4"><a href="#cb3-4"></a>$$</span>
+<span id="cb3-5"><a href="#cb3-5"></a><span class="cf">BEGIN</span></span>
+<span id="cb3-6"><a href="#cb3-6"></a>    <span class="cf">LOOP</span></span>
+<span id="cb3-7"><a href="#cb3-7"></a>        <span class="co">-- first try to update the key</span></span>
+<span id="cb3-8"><a href="#cb3-8"></a>        <span class="kw">UPDATE</span> db <span class="kw">SET</span> b <span class="op">=</span> <span class="kw">data</span> <span class="kw">WHERE</span> a <span class="op">=</span> <span class="kw">key</span>;</span>
+<span id="cb3-9"><a href="#cb3-9"></a>        <span class="cf">IF</span> found <span class="cf">THEN</span></span>
+<span id="cb3-10"><a href="#cb3-10"></a>            <span class="kw">RETURN</span>;</span>
+<span id="cb3-11"><a href="#cb3-11"></a>        <span class="cf">END</span> <span class="cf">IF</span>;</span>
+<span id="cb3-12"><a href="#cb3-12"></a>        <span class="co">-- not there, so try to insert the key</span></span>
+<span id="cb3-13"><a href="#cb3-13"></a>        <span class="co">-- if someone else inserts the same key concurrently,</span></span>
+<span id="cb3-14"><a href="#cb3-14"></a>        <span class="co">-- we could get a unique-key failure</span></span>
+<span id="cb3-15"><a href="#cb3-15"></a>        <span class="cf">BEGIN</span></span>
+<span id="cb3-16"><a href="#cb3-16"></a>            <span class="kw">INSERT</span> <span class="kw">INTO</span> db(a,b) <span class="kw">VALUES</span> (<span class="kw">key</span>, <span class="kw">data</span>);</span>
+<span id="cb3-17"><a href="#cb3-17"></a>            <span class="kw">RETURN</span>;</span>
+<span id="cb3-18"><a href="#cb3-18"></a>        <span class="kw">EXCEPTION</span> <span class="cf">WHEN</span> unique_violation <span class="cf">THEN</span></span>
+<span id="cb3-19"><a href="#cb3-19"></a>            <span class="co">-- Do nothing, and loop to try the UPDATE again.</span></span>
+<span id="cb3-20"><a href="#cb3-20"></a>        <span class="cf">END</span>;</span>
+<span id="cb3-21"><a href="#cb3-21"></a>    <span class="cf">END</span> <span class="cf">LOOP</span>;</span>
+<span id="cb3-22"><a href="#cb3-22"></a><span class="cf">END</span>;</span>
+<span id="cb3-23"><a href="#cb3-23"></a>$$</span>
+<span id="cb3-24"><a href="#cb3-24"></a>LANGUAGE plpgsql;</span>
+<span id="cb3-25"><a href="#cb3-25"></a></span>
+<span id="cb3-26"><a href="#cb3-26"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;david&#39;</span>);</span>
+<span id="cb3-27"><a href="#cb3-27"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;dennis&#39;</span>);</span></code></pre></div>
 <p>This solution has the advantage of delegating db-specific code into the DB and simplifying the SQL queries on the application side.</p>
 <h3 id="other-options">Other options</h3>
 <ul>
@@ -333,8 +507,8 @@ LANGUAGE plpgsql;
 </ul>
 <h2 id="partial-solutions">Partial solutions</h2>
 <p>If you know in advance that your process will not run concurrently, then all of the above can be greatly simplified. For example, if just want to make sure that a record exists in the db (and not fail with a duplicate key entry the second time), a combination of an INSERT and a SELECT will work, making use of the fact that INSERTS will accept a sub-SELECT instead of a VALUES clause:</p>
-<pre class="sourceCode sql"><code class="sourceCode sql"><span class="kw">INSERT</span> <span class="kw">INTO</span> TEST (whatever, counter)
-    <span class="kw">SELECT</span> <span class="dv">123</span>, <span class="dv">1</span> <span class="kw">WHERE</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> (<span class="kw">SELECT</span> * <span class="kw">FROM</span> test <span class="kw">WHERE</span> whatever = <span class="dv">123</span>);</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> TEST (whatever, counter)</span>
+<span id="cb4-2"><a href="#cb4-2"></a>    <span class="kw">SELECT</span> <span class="dv">123</span>, <span class="dv">1</span> <span class="kw">WHERE</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> (<span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> test <span class="kw">WHERE</span> whatever <span class="op">=</span> <span class="dv">123</span>);</span></code></pre></div>
 <p>… that is more concise, but not that different from checking the DB state inside the application code.</p>
 <p><a href="http://www.the-art-of-web.com/sql/upsert/">see</a></p>
 
@@ -398,35 +572,35 @@ LANGUAGE plpgsql;
 <p>You can read more about unboxed types <a href="http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html">in the manual</a>.</p>
 <h3 id="stream-fusion">Stream fusion</h3>
 <p>Consider a function like this:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
-squareAddTwo <span class="fu">=</span> sum <span class="fu">.</span> map (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> map (<span class="fu">*</span><span class="dv">3</span>) </code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1"></a><span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
+<span id="cb1-2"><a href="#cb1-2"></a>squareAddTwo <span class="ot">=</span> <span class="fu">sum</span> <span class="op">.</span> <span class="fu">map</span> (<span class="op">+</span><span class="dv">2</span>) <span class="op">.</span> <span class="fu">map</span> (<span class="op">*</span><span class="dv">3</span>) </span></code></pre></div>
 <p>It is supposed to multiply each element in an integer list by three, add two, and then sum up all the numbers in the list. A naive implementation of the above would use 3 lists: the input list and two intermediate lists for storing the result of the two <code>map</code> operations. These intermediate lists waste time and space doing useless temporary allocation and garbage collection.</p>
 <p>Now, with stream fusion, equational laws are applied to get rid of these intermediate structures in a process called deforestation. The above could be translated into something like:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell">myFoldingSquareAddTwo <span class="fu">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="fu">+</span> (y<span class="fu">*</span><span class="dv">3</span> <span class="fu">+</span> <span class="dv">2</span>)) <span class="dv">0</span></code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1"></a>myFoldingSquareAddTwo <span class="ot">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="op">+</span> (y<span class="op">*</span><span class="dv">3</span> <span class="op">+</span> <span class="dv">2</span>)) <span class="dv">0</span></span></code></pre></div>
 <p>Note that recent versions of GHC have deforestation built-in for regular lists, so you can take advantage of fusion provided you stick to the old suspects: <code>map</code>, <code>fold</code>, etc… If you implement your own recursive functions, then GHC will <em>not</em> be able to fuse. Here is a snippet that you can play with. I encourage you to try what is the largest value of <code>n</code> for which this program correctly terminates:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span>
-<span class="kw">import </span><span class="dt">System.Environment</span>
-<span class="kw">import </span><span class="dt">Data.List</span> (foldl&#39;)
-    
-myMap f [] <span class="fu">=</span> []
-myMap f (h<span class="fu">:</span>t) <span class="fu">=</span> f h <span class="fu">:</span> myMap f t
-
-mySum [] <span class="fu">=</span> <span class="dv">0</span>
-mySum (h<span class="fu">:</span>t) <span class="fu">=</span> h <span class="fu">+</span> mySum t
-
-mySquareAddTwo <span class="fu">=</span> mySum <span class="fu">.</span> myMap  (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> myMap (<span class="fu">*</span><span class="dv">2</span>) 
-
-<span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
-squareAddTwo <span class="fu">=</span> sum <span class="fu">.</span> map (<span class="fu">+</span><span class="dv">2</span>) <span class="fu">.</span> map (<span class="fu">*</span><span class="dv">3</span>) 
-
-<span class="ot">myFoldingSquareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span>
-myFoldingSquareAddTwo <span class="fu">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="fu">+</span> (y<span class="fu">*</span><span class="dv">3</span> <span class="fu">+</span> <span class="dv">2</span>)) <span class="dv">0</span>
-
-main <span class="fu">=</span> <span class="kw">do</span>
-  [n] <span class="ot">&lt;-</span> getArgs
-  print <span class="fu">$</span> squareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]
-  print <span class="fu">$</span> myFoldingSquareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]        
-  print <span class="fu">$</span> mySquareAddTwo [<span class="dv">1</span><span class="fu">..</span>read<span class="ot"> n ::</span> <span class="dt">Int</span>]  </code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span></span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">import</span> <span class="dt">System.Environment</span></span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">import</span> <span class="dt">Data.List</span> (foldl&#39;)</span>
+<span id="cb3-4"><a href="#cb3-4"></a>    </span>
+<span id="cb3-5"><a href="#cb3-5"></a>myMap f [] <span class="ot">=</span> []</span>
+<span id="cb3-6"><a href="#cb3-6"></a>myMap f (h<span class="op">:</span>t) <span class="ot">=</span> f h <span class="op">:</span> myMap f t</span>
+<span id="cb3-7"><a href="#cb3-7"></a></span>
+<span id="cb3-8"><a href="#cb3-8"></a>mySum [] <span class="ot">=</span> <span class="dv">0</span></span>
+<span id="cb3-9"><a href="#cb3-9"></a>mySum (h<span class="op">:</span>t) <span class="ot">=</span> h <span class="op">+</span> mySum t</span>
+<span id="cb3-10"><a href="#cb3-10"></a></span>
+<span id="cb3-11"><a href="#cb3-11"></a>mySquareAddTwo <span class="ot">=</span> mySum <span class="op">.</span> myMap  (<span class="op">+</span><span class="dv">2</span>) <span class="op">.</span> myMap (<span class="op">*</span><span class="dv">2</span>) </span>
+<span id="cb3-12"><a href="#cb3-12"></a></span>
+<span id="cb3-13"><a href="#cb3-13"></a><span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
+<span id="cb3-14"><a href="#cb3-14"></a>squareAddTwo <span class="ot">=</span> <span class="fu">sum</span> <span class="op">.</span> <span class="fu">map</span> (<span class="op">+</span><span class="dv">2</span>) <span class="op">.</span> <span class="fu">map</span> (<span class="op">*</span><span class="dv">3</span>) </span>
+<span id="cb3-15"><a href="#cb3-15"></a></span>
+<span id="cb3-16"><a href="#cb3-16"></a><span class="ot">myFoldingSquareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
+<span id="cb3-17"><a href="#cb3-17"></a>myFoldingSquareAddTwo <span class="ot">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="op">+</span> (y<span class="op">*</span><span class="dv">3</span> <span class="op">+</span> <span class="dv">2</span>)) <span class="dv">0</span></span>
+<span id="cb3-18"><a href="#cb3-18"></a></span>
+<span id="cb3-19"><a href="#cb3-19"></a>main <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb3-20"><a href="#cb3-20"></a>  [n] <span class="ot">&lt;-</span> getArgs</span>
+<span id="cb3-21"><a href="#cb3-21"></a>  <span class="fu">print</span> <span class="op">$</span> squareAddTwo [<span class="dv">1</span><span class="op">..</span><span class="fu">read</span><span class="ot"> n ::</span> <span class="dt">Int</span>]</span>
+<span id="cb3-22"><a href="#cb3-22"></a>  <span class="fu">print</span> <span class="op">$</span> myFoldingSquareAddTwo [<span class="dv">1</span><span class="op">..</span><span class="fu">read</span><span class="ot"> n ::</span> <span class="dt">Int</span>]        </span>
+<span id="cb3-23"><a href="#cb3-23"></a>  <span class="fu">print</span> <span class="op">$</span> mySquareAddTwo [<span class="dv">1</span><span class="op">..</span><span class="fu">read</span><span class="ot"> n ::</span> <span class="dt">Int</span>]  </span></code></pre></div>
 <h3 id="automatic-parallelism">Automatic parallelism</h3>
 <p>Repa provides a set of combinators for creating and manipulating arrays. The operations needed to build an array are described declaratively in a first step (creating a so-called <em>delayed</em> array), and then the array is later materialized (which will give an <em>unboxed</em> array).</p>
 <p>This double process allows for <code>repa</code> not only to fuse away the intermediate structures, but also to perform the required data dependency analysis prior to parallelizing the computation.</p>
@@ -437,70 +611,69 @@ main <span class="fu">=</span> <span class="kw">do</span>
 <p>In mathematics, a Voronoi diagram is a way of dividing space into a number of regions. A set of points (called seeds, sites, or generators) is specified beforehand and for each seed there will be a corresponding region consisting of all points closer to that seed than to any other. The regions are called Voronoi cells</p>
 </blockquote>
 <p>So we are trying to get a pretty picture like this one:</p>
-<div class="figure">
-<img src="/images/voronoi.png" title="Voronoi diagram" alt="Voronoi diagram" />
-<p class="caption">Voronoi diagram</p>
-</div>
+<figure>
+<img src="/images/voronoi.png" title="Voronoi diagram" alt="" /><figcaption>Voronoi diagram</figcaption>
+</figure>
 <p>It is a 512x512 images with 150 random centers. The colored polygons represent the areas which are closest to a particular center. The most popular algorithm for computing a Voronoi diagram in 2 dimensions seems to be <a href="http://en.wikipedia.org/wiki/Fortune&#39;s_algorithm">Fortune’s algorithm</a>. There are also nice open-source implementations out there: for real work, I’d recommend the excellent <a href="http://www.qhull.org/html/qvoronoi.htm">qhull library</a>.</p>
 <p>Since I was just interested in testing parallelism, I decided to implement it the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> way, which boils down to just applying the definition: take an image and a random set of in-range pixel coordinates (the centers). For each pixel, color it according to the center that lies closest (in our case, closest according to the euclidean metric). This algorithm is embarassingly naive, but also <a href="http://en.wikipedia.org/wiki/Embarrassingly_parallel">embarassingly parallel</a>, since each pixel can be computed independently.</p>
 <h2 id="the-source">The Source</h2>
 <p>The code is pretty straightforward. You can find the whole source <a href="https://raw.github.com/jarnaldich/jarnaldich.github.com/master/_src/posts/voronoi.hs">here</a>, or on the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> page.</p>
 <p>I’ll comment on the most important parts.</p>
 <p>First, we need a function for the metric to minimize. To make it faster, we will not take the square root. We will also use strict annotations and 32 bit unsigned integers (<code>Word32</code>), instead of Haskell’s unbounded <code>Int</code>s. Finally, we will tell GHC to inline it, since <code>Repa</code> recommends making extensive use of inlining (as always, when in doubt, profile).</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">{-# INLINE sqDistance #-}</span>    
-<span class="ot">sqDistance ::</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span>
-sqDistance <span class="fu">!</span>x1 <span class="fu">!</span>y1 <span class="fu">!</span>x2 <span class="fu">!</span>y2 <span class="fu">=</span> ((x1<span class="fu">-</span>x2)<span class="fu">^</span><span class="dv">2</span>) <span class="fu">+</span> ((y1<span class="fu">-</span>y2)<span class="fu">^</span><span class="dv">2</span>)</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1"></a><span class="ot">{-# INLINE sqDistance #-}</span>    </span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="ot">sqDistance ::</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span></span>
+<span id="cb4-3"><a href="#cb4-3"></a>sqDistance <span class="op">!</span>x1 <span class="op">!</span>y1 <span class="op">!</span>x2 <span class="op">!</span>y2 <span class="ot">=</span> ((x1<span class="op">-</span>x2)<span class="op">^</span><span class="dv">2</span>) <span class="op">+</span> ((y1<span class="op">-</span>y2)<span class="op">^</span><span class="dv">2</span>)</span></code></pre></div>
 <p>Getting a random array with the centers is easy and shows the way to generate unboxed arrays from a list in <code>repa</code>:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">centers ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM2</span> <span class="dt">Word32</span>
-centers nCenters nCells <span class="fu">=</span>
-      fromListUnboxed (<span class="dt">Z</span> <span class="fu">:.</span> nCenters <span class="fu">:.</span> <span class="dv">2</span>)
-    <span class="fu">$</span> take (<span class="dv">2</span><span class="fu">*</span>nCenters)
-    <span class="fu">$</span> randomRs (<span class="dv">0</span>, fromIntegral (nCells <span class="fu">-</span> <span class="dv">1</span>)) (mkStdGen <span class="dv">1</span>)</code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb5-1"><a href="#cb5-1"></a><span class="ot">centers ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM2</span> <span class="dt">Word32</span></span>
+<span id="cb5-2"><a href="#cb5-2"></a>centers nCenters nCells <span class="ot">=</span></span>
+<span id="cb5-3"><a href="#cb5-3"></a>      fromListUnboxed (<span class="dt">Z</span> <span class="op">:.</span> nCenters <span class="op">:.</span> <span class="dv">2</span>)</span>
+<span id="cb5-4"><a href="#cb5-4"></a>    <span class="op">$</span> <span class="fu">take</span> (<span class="dv">2</span><span class="op">*</span>nCenters)</span>
+<span id="cb5-5"><a href="#cb5-5"></a>    <span class="op">$</span> randomRs (<span class="dv">0</span>, <span class="fu">fromIntegral</span> (nCells <span class="op">-</span> <span class="dv">1</span>)) (mkStdGen <span class="dv">1</span>)</span></code></pre></div>
 <p>Note the type signature: <code>Array U DIM2 Word32</code> means unboxed array (the <code>U</code>), indexed by 2 integers (the <code>DIM2</code>) and storing <code>Word32</code> values. The indexing is a bit tricky, since is mostly done with the <code>:.</code> operator, and the notation is somewhat overloaded to denote indexes and shapes, so <code>arr Repa.! (Z:. i :. j)</code> means the element in the ith row and jth column of the array arr, but <code>fromListUnboxed (Z :. nCenters :. 2)</code> means we are creating an array of <code>nCenters</code> rows and 2 columns.</p>
 <p>Now there come two helper functions. The first one takes a 2 column matrix and a two parameter function and returns the array resulting of applying the function to each row.</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell">applyReduce2 arr f <span class="fu">=</span> 
-    traverse arr (\(i <span class="fu">:.</span> j) <span class="ot">-&gt;</span> i) <span class="fu">$</span> \lookup (<span class="dt">Z</span><span class="fu">:.</span>i) <span class="ot">-&gt;</span>
-        f (lookup (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span><span class="dv">0</span>)) (lookup (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span><span class="dv">1</span>))</code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb6-1"><a href="#cb6-1"></a>applyReduce2 arr f <span class="ot">=</span> </span>
+<span id="cb6-2"><a href="#cb6-2"></a>    <span class="fu">traverse</span> arr (\(i <span class="op">:.</span> j) <span class="ot">-&gt;</span> i) <span class="op">$</span> \<span class="fu">lookup</span> (<span class="dt">Z</span><span class="op">:.</span>i) <span class="ot">-&gt;</span></span>
+<span id="cb6-3"><a href="#cb6-3"></a>        f (<span class="fu">lookup</span> (<span class="dt">Z</span><span class="op">:.</span>i<span class="op">:.</span><span class="dv">0</span>)) (<span class="fu">lookup</span> (<span class="dt">Z</span><span class="op">:.</span>i<span class="op">:.</span><span class="dv">1</span>))</span></code></pre></div>
 <p>In order to do so, this function makes use of a very powerful <code>repa</code> combinator, which takes a function on the indices (in this case, reduces one dimension) and a two parameter function. The first parameter is itself a lookup function on the input array, while the second one is the index of the output array whose value we are trying to compute. Please refer to the <a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial">tutorial</a> if this is not clear enough.</p>
 <p>Apart from <code>traverse</code>, there are more familiar combinators, like <code>foldS</code>, which is just like a fold for arrays. We make use of it to compute the minimum of a function over an array. The final <code>S</code> stands for “sequential”. Some repa combinators come in two flavors: sequential ones or parallel ones (would be <code>foldP</code>). For this algorithm we will parallelize only the pixel loop, so we are using the sequential version for the minimization loop. Here’s the minimization function, which basically decorates the array with an index before folding over it:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell">minimize1D arr <span class="fu">=</span> foldS f h t
-  <span class="kw">where</span>
-    indexer src idx<span class="fu">@</span>(<span class="dt">Z</span> <span class="fu">:.</span> i) <span class="fu">=</span> (src idx, (fromIntegral i))
-    indexed arr <span class="fu">=</span> traverse arr id indexer
-    (<span class="dt">Z</span> <span class="fu">:.</span> n) <span class="fu">=</span> extent arr
-    iarr <span class="fu">=</span> indexed arr
-    h <span class="fu">=</span> iarr <span class="fu">!</span> (<span class="dt">Z</span> <span class="fu">:.</span> <span class="dv">0</span>)
-    t <span class="fu">=</span> extract (<span class="dt">Z</span> <span class="fu">:.</span> <span class="dv">1</span>) (<span class="dt">Z</span> <span class="fu">:.</span> (n<span class="fu">-</span><span class="dv">1</span>)) iarr
-    f min<span class="fu">@</span>(<span class="fu">!</span>valMin, <span class="fu">!</span>iMin ) x<span class="fu">@</span>(<span class="fu">!</span>val, <span class="fu">!</span>i) <span class="fu">|</span> val <span class="fu">&lt;</span> valMin <span class="fu">=</span> x
-                                         <span class="fu">|</span> otherwise <span class="fu">=</span> min</code></pre>
+<div class="sourceCode" id="cb7"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb7-1"><a href="#cb7-1"></a>minimize1D arr <span class="ot">=</span> foldS f h t</span>
+<span id="cb7-2"><a href="#cb7-2"></a>  <span class="kw">where</span></span>
+<span id="cb7-3"><a href="#cb7-3"></a>    indexer src idx<span class="op">@</span>(<span class="dt">Z</span> <span class="op">:.</span> i) <span class="ot">=</span> (src idx, (<span class="fu">fromIntegral</span> i))</span>
+<span id="cb7-4"><a href="#cb7-4"></a>    indexed arr <span class="ot">=</span> <span class="fu">traverse</span> arr <span class="fu">id</span> indexer</span>
+<span id="cb7-5"><a href="#cb7-5"></a>    (<span class="dt">Z</span> <span class="op">:.</span> n) <span class="ot">=</span> extent arr</span>
+<span id="cb7-6"><a href="#cb7-6"></a>    iarr <span class="ot">=</span> indexed arr</span>
+<span id="cb7-7"><a href="#cb7-7"></a>    h <span class="ot">=</span> iarr <span class="op">!</span> (<span class="dt">Z</span> <span class="op">:.</span> <span class="dv">0</span>)</span>
+<span id="cb7-8"><a href="#cb7-8"></a>    t <span class="ot">=</span> extract (<span class="dt">Z</span> <span class="op">:.</span> <span class="dv">1</span>) (<span class="dt">Z</span> <span class="op">:.</span> (n<span class="op">-</span><span class="dv">1</span>)) iarr</span>
+<span id="cb7-9"><a href="#cb7-9"></a>    f min<span class="op">@</span>(<span class="op">!</span>valMin, <span class="op">!</span>iMin ) x<span class="op">@</span>(<span class="op">!</span>val, <span class="op">!</span>i) <span class="op">|</span> val <span class="op">&lt;</span> valMin <span class="ot">=</span> x</span>
+<span id="cb7-10"><a href="#cb7-10"></a>                                         <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> <span class="fu">min</span></span></code></pre></div>
 <p>With these helpers, writing a parallel voronoi is easy. We will make use of <code>fromFunction</code> to create a <em>delayed</em> array, which we can later force to compute.</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">voronoi ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">D</span> <span class="dt">DIM2</span> <span class="dt">Word32</span>
-voronoi nCenters nCells <span class="fu">=</span>
-    <span class="kw">let</span>
-      cellReducer <span class="fu">=</span> applyReduce2 (centers nCenters nCells)
-      nearestCenterIndex <span class="fu">=</span> snd <span class="fu">.</span> (<span class="fu">Repa.!</span> <span class="dt">Z</span>) <span class="fu">.</span> minimize1D
-      <span class="ot">{-# INLINE builder #-}</span>
-      builder (<span class="dt">Z</span><span class="fu">:.</span>i<span class="fu">:.</span>j) <span class="fu">=</span> nearestCenterIndex
-                        <span class="fu">$</span> cellReducer <span class="fu">$</span> on sqDistance fromIntegral i j
-    <span class="kw">in</span>        
-      Repa.fromFunction (<span class="dt">Z</span> <span class="fu">:.</span> nCells <span class="fu">:.</span><span class="ot"> nCells ::</span> <span class="dt">DIM2</span>) builder</code></pre>
+<div class="sourceCode" id="cb8"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb8-1"><a href="#cb8-1"></a><span class="ot">voronoi ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">D</span> <span class="dt">DIM2</span> <span class="dt">Word32</span></span>
+<span id="cb8-2"><a href="#cb8-2"></a>voronoi nCenters nCells <span class="ot">=</span></span>
+<span id="cb8-3"><a href="#cb8-3"></a>    <span class="kw">let</span></span>
+<span id="cb8-4"><a href="#cb8-4"></a>      cellReducer <span class="ot">=</span> applyReduce2 (centers nCenters nCells)</span>
+<span id="cb8-5"><a href="#cb8-5"></a>      nearestCenterIndex <span class="ot">=</span> <span class="fu">snd</span> <span class="op">.</span> (<span class="op">Repa.!</span> <span class="dt">Z</span>) <span class="op">.</span> minimize1D</span>
+<span id="cb8-6"><a href="#cb8-6"></a>      <span class="ot">{-# INLINE builder #-}</span></span>
+<span id="cb8-7"><a href="#cb8-7"></a>      builder (<span class="dt">Z</span><span class="op">:.</span>i<span class="op">:.</span>j) <span class="ot">=</span> nearestCenterIndex</span>
+<span id="cb8-8"><a href="#cb8-8"></a>                        <span class="op">$</span> cellReducer <span class="op">$</span> on sqDistance <span class="fu">fromIntegral</span> i j</span>
+<span id="cb8-9"><a href="#cb8-9"></a>    <span class="kw">in</span>        </span>
+<span id="cb8-10"><a href="#cb8-10"></a>      Repa.fromFunction (<span class="dt">Z</span> <span class="op">:.</span> nCells <span class="op">:.</span><span class="ot"> nCells ::</span> <span class="dt">DIM2</span>) builder</span></code></pre></div>
 <p>The <code>voronoi</code> function creates a matrix of integer indices, referring to the center which is closest. If we want to write that as an RGB image, we will also need a function to create a random color table and another one to colorize the voronoi array:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">genColorTable ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM1</span> (<span class="dt">Word8</span>, <span class="dt">Word8</span>, <span class="dt">Word8</span>)
-genColorTable n <span class="fu">=</span> fromListUnboxed (<span class="dt">Z</span> <span class="fu">:.</span> n) <span class="fu">$</span> zip3 l1 l2 l3
-    <span class="kw">where</span>
-      randoms <span class="fu">=</span> randomRs (<span class="dv">0</span>,<span class="dv">255</span>) (mkStdGen <span class="dv">1</span>)
-      (l1, rest1) <span class="fu">=</span> splitAt n randoms
-      (l2, rest2) <span class="fu">=</span> splitAt n rest1
-      l3 <span class="fu">=</span> take n rest2
-
-colorize ctable <span class="fu">=</span> Repa.map <span class="fu">$</span> \x <span class="ot">-&gt;</span> ctable <span class="fu">Repa.!</span> (<span class="dt">Z</span><span class="fu">:.</span> fromIntegral x)</code></pre>
+<div class="sourceCode" id="cb9"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb9-1"><a href="#cb9-1"></a><span class="ot">genColorTable ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM1</span> (<span class="dt">Word8</span>, <span class="dt">Word8</span>, <span class="dt">Word8</span>)</span>
+<span id="cb9-2"><a href="#cb9-2"></a>genColorTable n <span class="ot">=</span> fromListUnboxed (<span class="dt">Z</span> <span class="op">:.</span> n) <span class="op">$</span> <span class="fu">zip3</span> l1 l2 l3</span>
+<span id="cb9-3"><a href="#cb9-3"></a>    <span class="kw">where</span></span>
+<span id="cb9-4"><a href="#cb9-4"></a>      randoms <span class="ot">=</span> randomRs (<span class="dv">0</span>,<span class="dv">255</span>) (mkStdGen <span class="dv">1</span>)</span>
+<span id="cb9-5"><a href="#cb9-5"></a>      (l1, rest1) <span class="ot">=</span> <span class="fu">splitAt</span> n randoms</span>
+<span id="cb9-6"><a href="#cb9-6"></a>      (l2, rest2) <span class="ot">=</span> <span class="fu">splitAt</span> n rest1</span>
+<span id="cb9-7"><a href="#cb9-7"></a>      l3 <span class="ot">=</span> <span class="fu">take</span> n rest2</span>
+<span id="cb9-8"><a href="#cb9-8"></a></span>
+<span id="cb9-9"><a href="#cb9-9"></a>colorize ctable <span class="ot">=</span> Repa.map <span class="op">$</span> \x <span class="ot">-&gt;</span> ctable <span class="op">Repa.!</span> (<span class="dt">Z</span><span class="op">:.</span> <span class="fu">fromIntegral</span> x)</span></code></pre></div>
 <p>As we can see, the colorized table will be a two dimensional array of 3-element tuples: one for the red, green, and blue components. This is the format expected by <code>writeImageToBMP</code> in the <code>Repa.IO.BMP</code> package.</p>
 <p>with all the above, the main function will look like:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell">main <span class="fu">=</span> <span class="kw">do</span>
-  <span class="kw">let</span> nsites <span class="fu">=</span> <span class="dv">150</span>
-  <span class="kw">let</span> ctable <span class="fu">=</span> genColorTable nsites 
-  voro <span class="ot">&lt;-</span> computeP <span class="fu">$</span> colorize ctable <span class="fu">$</span> voronoi nsites <span class="dv">512</span>
-  writeImageToBMP <span class="st">&quot;out.bmp&quot;</span> voro</code></pre>
+<div class="sourceCode" id="cb10"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb10-1"><a href="#cb10-1"></a>main <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb10-2"><a href="#cb10-2"></a>  <span class="kw">let</span> nsites <span class="ot">=</span> <span class="dv">150</span></span>
+<span id="cb10-3"><a href="#cb10-3"></a>  <span class="kw">let</span> ctable <span class="ot">=</span> genColorTable nsites </span>
+<span id="cb10-4"><a href="#cb10-4"></a>  voro <span class="ot">&lt;-</span> computeP <span class="op">$</span> colorize ctable <span class="op">$</span> voronoi nsites <span class="dv">512</span></span>
+<span id="cb10-5"><a href="#cb10-5"></a>  writeImageToBMP <span class="st">&quot;out.bmp&quot;</span> voro</span></code></pre></div>
 <p>There are some cool things going on under the hood. First, note that we just plugged the <code>colorize</code> and <code>voronoi</code> parts. In spite of this, there will be no intermediate arrays: both calculations will be fused into a single operation.</p>
 <p>The second thing is the use of a parallel combinator <code>computeP</code>, which will transform a delayed array into an unboxed one <em>in parallel</em> (given the appropiate compilation options and runtime parameters). Note that parallel computations in repa must run in some monad, to ensure they are performed in the appropiate order. It can be any monad (in this case, it’s <code>main</code>’s <code>IO</code>).</p>
 <p>Now, if we compile with</p>
@@ -626,25 +799,25 @@ gen[1].sync: 3</code></pre>
 <h2 id="the-basics">The Basics</h2>
 <p>Here’s what most Haskellers would recommend:</p>
 <p><strong>If you do not care about Unicode</strong>, use <code>Data.ByteString.Char8</code>, which is a packed array of <code>Char8</code> (bytes). The lazy variant is <code>Data.ByteString.Lazy.Char8</code>. This will be enough if you can assume your input is in (a subset of) <em>latin-1</em>.</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.ByteString.Char8</span> <span class="kw">as</span> <span class="dt">B</span></code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.ByteString.Char8</span> <span class="kw">as</span> <span class="dt">B</span></span></code></pre></div>
 <p>or</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.ByteString.Lazy.Char8</span> <span class="kw">as</span> <span class="dt">B</span></code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.ByteString.Lazy.Char8</span> <span class="kw">as</span> <span class="dt">B</span></span></code></pre></div>
 <p><strong>If you care about Unicode</strong>, go use <code>Data.Text.Text</code>:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
-<span class="kw">import qualified</span> <span class="dt">Data.Text.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></span></code></pre></div>
 <p>or</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text.Lazy</span> <span class="kw">as</span> <span class="dt">T</span>
-<span class="kw">import qualified</span> <span class="dt">Data.Text.Lazy.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.Lazy</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text.Lazy.IO</span> <span class="kw">as</span> <span class="dt">TextIO</span></span></code></pre></div>
 <p>If you need regular expressions with Unicode, though, the thing gets a little more <a href="http://stackoverflow.com/questions/14922579/haskell-regular-expressions-and-data-text">involved</a>.</p>
 <h2 id="back-and-forth">Back and forth</h2>
 <p>Even if you use these types, you will still need <code>Prelude.String</code> in your code: there are a lot of libraries which will expect and return <code>String</code>s. As an example, the <code>FilePath</code> type for file and directory manipulation is just an alias for <code>String</code>. Also, every string literal in your code will be parsed as a <code>String</code> by default (but see below), so converting from <em>packed</em> <code>ByteArrays</code> to <em>unpacked</em> <code>String</code>s is achived, not surprisingly, by the functions <code>pack</code> and <code>unpack</code>. In fact, using <code>String</code> in your APIs, as long as they’re not too large, is one (the only?) sensible use for <code>Strings</code>.</p>
 <p>For the <a href="http://www.haskell.org/ghc/">GHC</a> stack you can avoid packing and unpacking string literals by using the <code>OverloadedStrings</code> pragma. Ie. instead of writing:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
-myFuncExpectingDataText <span class="fu">.</span> T.pack <span class="fu">$</span> <span class="st">&quot;Hello World!&quot;</span></code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb5-1"><a href="#cb5-1"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb5-2"><a href="#cb5-2"></a>myFuncExpectingDataText <span class="op">.</span> T.pack <span class="op">$</span> <span class="st">&quot;Hello World!&quot;</span></span></code></pre></div>
 <p>you can add the pragma that makes the call to <code>T.pack</code> unnecessary:</p>
-<pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span>
-<span class="kw">import qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span>
-myFuncExpectingDataText <span class="st">&quot;Hello World!&quot;</span></code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb6-1"><a href="#cb6-1"></a><span class="ot">{-# LANGUAGE OverloadedStrings #-}</span></span>
+<span id="cb6-2"><a href="#cb6-2"></a><span class="kw">import</span> <span class="kw">qualified</span> <span class="dt">Data.Text</span> <span class="kw">as</span> <span class="dt">T</span></span>
+<span id="cb6-3"><a href="#cb6-3"></a>myFuncExpectingDataText <span class="st">&quot;Hello World!&quot;</span></span></code></pre></div>
 <h2 id="conclusions">Conclusions</h2>
 <p>Here’s my piece of advice:</p>
 <ul>
@@ -809,10 +982,10 @@ IN: scratchpad </code></pre>
 </code></pre>
 <p>You need to write:</p>
 <pre class="racket"><code>(directory-list &quot;\\\\MACHINE\\Share\\directory&quot;)</code></pre>
-<p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@&quot;&quot;</code> syntax, then you’d probably miss the feature.</p>
+<p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@""</code> syntax, then you’d probably miss the feature.</p>
 <h1 id="the-plan">The plan</h1>
 <p>Racket is extensible by design. When we run a racket program, there are several stages involved:</p>
-<ol style="list-style-type: decimal">
+<ol type="1">
 <li><p>First, a <em>reader</em> layer turns a stream of characters into a kind of AST. Since racket is a lisp, this AST is, of course, made up of s-expressions. But in Racket’s case, they’re a particular kind of s-expressions which contain extra information on their lexical scope and their source location, and are called <em>syntax objects</em>.</p></li>
 <li><p>After that, those syntax objects are further expanded through the macro layer.</p></li>
 </ol>
@@ -861,7 +1034,7 @@ IN: scratchpad </code></pre>
                            ))) ; check location info
   
   (to-syntax  (strip-last-char (bytes-&gt;string/locale (car raw-str)))))</code></pre>
-<p>If you name the above module as <code>reader_extension.rkt</code>, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending <code>#reader&quot;reader_extension.rkt&quot;</code>. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it’s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.</p>
+<p>If you name the above module as <code>reader_extension.rkt</code>, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending <code>#reader"reader_extension.rkt"</code>. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it’s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.</p>
 <p>See these rackunit tests for an example:</p>
 <pre class="racket"><code>(require rackunit)
 (check-equal? #reader&quot;reader_extension.rkt&quot;(\\TEST\One) 
@@ -870,12 +1043,12 @@ IN: scratchpad </code></pre>
 (check-equal? #reader&quot;reader_extension.rkt&quot;_\test\no\escape_ 
               &quot;\\test\\no\\escape&quot;)</code></pre>
 <h1 id="the-readtable-hook">The readtable hook</h1>
-<p>While the above fully works, It may not save much typing having to write <code>#reader&quot;reader_extension.rkt&quot;</code> instead of manually backslashing the string. It would be more convenient to just use one character, for example <code>$</code>, like this:</p>
+<p>While the above fully works, It may not save much typing having to write <code>#reader"reader_extension.rkt"</code> instead of manually backslashing the string. It would be more convenient to just use one character, for example <code>$</code>, like this:</p>
 <pre class="racket"><code>(directory-list $(\\SERVER\Share))</code></pre>
 <p>Fortunately, that’s pretty easy: the racket reader is implemented as a recursive descent parser, and you can hook your own functions to call back when the parser sees a character. This association between characters and callbacks is known as the readtable.</p>
 <p>The readtable has a dynamic scope (it’s a <code>parameter</code>), and every call to the <code>read</code> and <code>read-syntax</code> functions is performed in the context of a readtable. There is, of course, a starting default readtable in case the user didn’t specify one.</p>
 <h1 id="using-the-extension-as-a-language">Using the extension as a language</h1>
-<p>The other drawback of using the <code>#reader&quot;reader_extension.rkt&quot;</code> prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:</p>
+<p>The other drawback of using the <code>#reader"reader_extension.rkt"</code> prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:</p>
 <pre class="racket"><code>#lang with-raw-string racket #\%
 (regexp-split (pregexp %&#39;\s&#39;) &quot;two fields&quot;)</code></pre>
 <p>Meaning that you add raw string syntax on top of the <code>racket</code> language with <code>%</code> as your readtable character.</p>
