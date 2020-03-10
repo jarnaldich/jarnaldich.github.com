@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <title>Joan Arnaldich - Raw Strings in Racket</title>
+
+        <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
+
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
+    </head>
+    <body>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <div class="page-header">
+                        <h1>Joan
+                        Arnaldich<sup class="sup-title">(.me)</sup></h1>
+
+                        <div style="margin-top:20px;">
+                            <div class="row">
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <h1>Raw Strings in Racket</h1>
+
+<small>Posted on August  7, 2011 <a href="/blog/2011/08/07/raw-strings-in-racket.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>One of the features I missed from the outstanding lisp dialect <a href="http://www.racket-lang.org/">Racket</a> (formerly known as PLT Scheme), especially when working on windows, was the ability to use some raw string syntax. I this article I explain how easy it is for such a feature to be implemented in Racket thanks to the language’s ability to extend its own syntax.</p>
+<!-- more -->
+<p><strong>2011-08-14 UPDATE:</strong> This article can be used as a tutorial for implementing readtable extensions to Racket. If you just want the functionality, you can achieve it with the <code>at-exp</code> language, already included in Racket’s distribution. Just skip to the <a href="#at-exp">at-exp</a> section at the end of this tutorial to see how.</p>
+<h1 id="the-problem">The problem</h1>
+<p>This will probably sound familiar to any of you using windows paths or regexes in a language with strings supporting backslash escape sequences. Essentially, the problem is that instead of writing, for example:</p>
+<pre><code class="language-lisp">
+(directory-list "\\MACHINE\Share\directory")
+</code></pre>
+<p>You need to write:</p>
+<pre class="racket"><code>(directory-list &quot;\\\\MACHINE\\Share\\directory&quot;)</code></pre>
+<p>Not an awful amount of work, but if you got to appreciate python’s convenient <code>r''</code> and C# <code>@""</code> syntax, then you’d probably miss the feature.</p>
+<h1 id="the-plan">The plan</h1>
+<p>Racket is extensible by design. When we run a racket program, there are several stages involved:</p>
+<ol type="1">
+<li><p>First, a <em>reader</em> layer turns a stream of characters into a kind of AST. Since racket is a lisp, this AST is, of course, made up of s-expressions. But in Racket’s case, they’re a particular kind of s-expressions which contain extra information on their lexical scope and their source location, and are called <em>syntax objects</em>.</p></li>
+<li><p>After that, those syntax objects are further expanded through the macro layer.</p></li>
+</ol>
+<p>The extension architecture in Racket will let you “plug” your extension into existing languages, so in the process of creating a new language you can (and usually will) build upon existing features.</p>
+<p>Our purpose, then, is to build a new language on top of racket by tuning the reader so that we can pass strings verbatim to the expander layer.</p>
+<h1 id="the-reader-extension">The reader extension</h1>
+<p>Racket provides a standard way to extend the reader by writing the so called <em>reader extensions</em>. Those are modules that implement the <code>read</code> and <code>read-syntax</code> functions. Remember lisp is code-as-data? <code>read</code> is called when forms are to be used as data, and can return any kind of value; <code>read-syntax</code> is called when forms are to be interpreted as code, since its output is a syntax object. Apart from the source location and scope, their behaviour should be equivalent not to mislead the users, so you can implement <code>read</code> from <code>read-syntax</code> just by stripping the lexical information.</p>
+<p>The implementation is listed below:</p>
+<pre class="racket"><code>(require syntax/readerr)
+(provide read read-syntax)
+
+(define (read in)
+  (syntax-&gt;datum (read-syntax #f in)))
+
+(define (read-syntax src in)
+  
+  (define opening-char (read-char in))
+  (define closing-str (case opening-char
+                         [(#\() &quot;\\)&quot;]
+                         [(#\[) &quot;\\]&quot;]
+                         [(#\{) &quot;\\}&quot;]
+                         [else (string opening-char)]))
+  
+  (define regex (pregexp (string-append &quot;^.*?&quot; closing-str)))
+  
+  (define-values (line col pos) (port-next-location in))
+  
+  (define raw-str (regexp-match regex in))
+  
+  (unless raw-str 
+    (raise-read-error &quot;bad raw string syntax&quot;
+                      src line col pos
+                      (- (file-position in) pos)))
+  
+  (define (strip-last-char s)
+    (substring s 0 (- (string-length s) 1)))
+
+  (define (to-syntax v)
+    (datum-&gt;syntax #f ; lexical context. read-syntax should have no lexical context
+                   v; Value
+                   (vector src ; File, normally syntax-source
+                           line  ; line
+                           col  ; column
+                           pos  ; character since beginning of source
+                           (string-length v)  ; the span (width)
+                           ))) ; check location info
+  
+  (to-syntax  (strip-last-char (bytes-&gt;string/locale (car raw-str)))))</code></pre>
+<p>If you name the above module as <code>reader_extension.rkt</code>, then you can pass a raw string to the expander by invoking the reader extension at any moment in your code, just by prepending <code>#reader"reader_extension.rkt"</code>. The reader extension, as you can see in the previous listing, is written so that the first character defines the extent of the string. If it’s a pairing character (normal or curly brackets and parenthesis), then it expects the appropiate closing. Oherwise it looks for the same character.</p>
+<p>See these rackunit tests for an example:</p>
+<pre class="racket"><code>(require rackunit)
+(check-equal? #reader&quot;reader_extension.rkt&quot;(\\TEST\One) 
+              &quot;\\\\TEST\\One&quot;)
+
+(check-equal? #reader&quot;reader_extension.rkt&quot;_\test\no\escape_ 
+              &quot;\\test\\no\\escape&quot;)</code></pre>
+<h1 id="the-readtable-hook">The readtable hook</h1>
+<p>While the above fully works, It may not save much typing having to write <code>#reader"reader_extension.rkt"</code> instead of manually backslashing the string. It would be more convenient to just use one character, for example <code>$</code>, like this:</p>
+<pre class="racket"><code>(directory-list $(\\SERVER\Share))</code></pre>
+<p>Fortunately, that’s pretty easy: the racket reader is implemented as a recursive descent parser, and you can hook your own functions to call back when the parser sees a character. This association between characters and callbacks is known as the readtable.</p>
+<p>The readtable has a dynamic scope (it’s a <code>parameter</code>), and every call to the <code>read</code> and <code>read-syntax</code> functions is performed in the context of a readtable. There is, of course, a starting default readtable in case the user didn’t specify one.</p>
+<h1 id="using-the-extension-as-a-language">Using the extension as a language</h1>
+<p>The other drawback of using the <code>#reader"reader_extension.rkt"</code> prefix is that you need to make the module available to each project, and use the prefix each time you introduce a string. It would be both nicer and more racketish to be able to use it any other language, like this:</p>
+<pre class="racket"><code>#lang with-raw-string racket #\%
+(regexp-split (pregexp %&#39;\s&#39;) &quot;two fields&quot;)</code></pre>
+<p>Meaning that you add raw string syntax on top of the <code>racket</code> language with <code>%</code> as your readtable character.</p>
+<h1 id="the-syntax-modulereader-language">The syntax-module/reader language</h1>
+<p>Fortunately, both problems can be solved by using the syntax/module-reader language, which is a helper language for installing your own languages into a Racket distribution.</p>
+<p>All you need to do is locate the collects dir <code>(find-user-collects-dir)</code> and place the “reader_extension.rkt” in a subdirectory called <code>with-raw-string/lang</code> together with a <code>reader.rkt</code> with this contents:</p>
+<pre class="racket"><code>(module reader syntax/module-reader
+  #:language read 
+  #:wrapper2 (lambda (in rd)
+               (parameterize ([current-readtable 
+                               (make-raw-str-readtable (read in))])
+                 (rd in)))
+  
+  (require syntax/readerr
+           (prefix-in raw: &quot;reader_extension.rkt&quot;))
+    
+  (define readtable-hook
+    (case-lambda
+      [(ch in)
+       (raw:read in)]
+      [(ch in src line col pos)
+       (raw:read-syntax src in)]))
+  
+  (define (make-raw-str-readtable c)
+    (make-readtable (current-readtable)
+                    c &#39;terminating-macro readtable-hook)))</code></pre>
+<p>The interesting points are:</p>
+<ul>
+<li><p>The <code>make-raw-str-readtable</code> will create a readtable that will call the <code>reader_extension</code> functions with its character argument.</p></li>
+<li><p>The <code>#:language</code> keyword will let you specify the underlying language. It can be a literal or a callback function. In this case we use the <code>read</code> function as a callback, so that we read the underlying language from the input stream.</p></li>
+<li><p>The <code>#:wrapper2</code> callback will parameterize both <code>read</code> and <code>read-syntax</code> with the quote-character enhanced readtable. Note that the quoting char is also read from the input stream first.</p></li>
+</ul>
+<p><a name="at-exp" > </a> # UPDATE: The <code>at-exp</code> language</p>
+<p>After posting a link to this tutorial to the <code>users@racket-lang.org</code> mailing list (a very active and helpful list for Racket users), Eli Barzilay (one of Racket’s core developers) pointed out that the [at-exp](http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp) language could be used to achieve the same results. This language acts at the reader level and was originally developed for <a href="http://docs.racket-lang.org/scribble/index.html?q=scribble">scribble</a> (a family of languages for writing textual content, such as racket’s documentation itself).</p>
+<p>Basically, <code>at-exp</code> extends another language (passed in as a parameter, like the one in this tutorial), so that expressions of the form:</p>
+<pre class="racket"><code>@func{Text here}</code></pre>
+<p>make it to the expansion layer like</p>
+<pre class="racket"><code>(func &quot;Text here&quot;)</code></pre>
+<p>Where text is read literally (no backslash substitution). So here’s a way to achieve the same functionality we expected just by what’s already provided by Racket:</p>
+<pre class="racket"><code>#lang at-exp racket
+(define r string-append)
+(display @r{...nearly free text here...})</code></pre>
+<p>When using <strong>DrRacket</strong>, you can press the <em>Macro Stepper</em> button to see how the above is read:</p>
+<pre class="racket"><code>(module anonymous-module racket
+  (#%module-begin
+   (define r string-append)
+   (display (r &quot;...nearly free text here...&quot;))))</code></pre>
+<p>Of course, the <code>r</code> is there just to make the syntax shorter… you could just use <code>string-append</code> each time. There is also another way to pass parameters to the <code>@</code> functions, which is not relevant here, through <code>[]</code>. Check the [docs](http://docs.racket-lang.org/scribble/reader-internals.html?q=at-exp#(mod-path._at-exp) for the details.</p>
+<h1 id="conclusions">Conclusions</h1>
+<p>You see how easy it is to add new features on top of the Racket language. How many languages do you know that you can modify to match your needs in this way?</p>
+<p>BTW, The above code is available at <a href="http://github.com/jarnaldich/with-raw-string">github</a>.</p>
+<h1 id="further-reading">Further Reading</h1>
+<p>Check out <a href="http://docs.racket-lang.org/guide/languages.html">the excellent Racket documentation</a> on creating new languages for racket. Seriously, the racket documentation system is as impressive as Racket itself.</p>
+<p>Check out <a href="http://hashcollision.org/brainfudge/">This article</a> for a more complete example on how to design a Turing-complete (but maybe not that useful) language in Racket.</p>
+<p>Check out <a href="http://matt.might.net/articles/implementing-a-programming-language/">This other article</a> to see how to develop an interpreter for two small languages, but without using Racket’s language extension mechanisms (evaluation is performed at run-time, through an eval function).</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/racket.html">racket</a>, <a href="/tags/scheme.html">scheme</a>, <a href="/tags/lisp.html">lisp</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2011/08/07/raw-strings-in-racket.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+
+                </div>
+            </div>
+        </div>
+
+        <script>
+          (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+                  ga('create', 'UA-6838480-2', 'jarnaldich.me');
+                    ga('send', 'pageview');
+
+        </script>
+
+
+    </body>
+</html>

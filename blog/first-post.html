@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <title>Joan Arnaldich - Blogging with Jekyll</title>
+
+        <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
+
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
+    </head>
+    <body>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <div class="page-header">
+                        <h1>Joan
+                        Arnaldich<sup class="sup-title">(.me)</sup></h1>
+
+                        <div style="margin-top:20px;">
+                            <div class="row">
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <h1>Blogging with Jekyll</h1>
+
+<small>Posted on July  1, 2011 <a href="/blog/2011/07/01/first-post.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>… or, “from static to dynamic and back again”.</p>
+<p>I’ve finally decided to set-up a new technical blog. I think one of the main reasons it took me so long to start was that I couldn’t find an engine that matched my taste. Ok… as a coder, my taste is not exactly that of a final user.</p>
+<!-- more -->
+<ul>
+<li>I didn’t want to pay. I woult have felt a bit dumb knowing I could be using something like <a href="http://www.wordpress.com">WordPress</a> or <a href="http://www.blogger.com">Blogger</a> for free even if they’re not exactly what I’m looking for.</li>
+<li>I don’t think storing pages in a relational DB is the smartest thing to do. Relational DBs are for structured data, not documents.</li>
+<li>I want to be able to use the tools I learned to love as a coder in my posts. After all, It’s all about text, right? I want versioning, regexp searches, and all that good old unix tools for text processing.</li>
+<li>I’d rather die than use a web-based editor.</li>
+<li>I want to be able to produce high quality, standards compliant and easily modifyable html… but authoring in a more human-friendly markup, of course…</li>
+<li>I don’t want to be stuck to a system once I’ve started. What I care most is content. I want to be able to migrate my posts whenever I want.</li>
+<li>The system should be elegant, not a bunch of scripts tied together.</li>
+</ul>
+<p>After reading <a href="http://tom.preston-werner.com/2008/11/17/blogging-like-a-hacker.html">this post</a>, it became clear that what I wanted was a <em>static</em> site generator.</p>
+<p>Static? But that’s soooo 1990s… well yes… and no. I’ve you’ve ever tried to roll your own blog engine (a common web framework learning exercice), and got to the point of optimization, you may have come to realize that you can cache most, if not all, your content… mmmmm… This is certainly oversimplifying, but you get the point:</p>
+<p>DYNAMIC + A WHOLE LOT OF CACHING = STATIC</p>
+<p>The other, probably most relevant, difference from the 90s is the mashups culture. Your web app can rely on third party services for its dynamic parts. (IMHO, Even if you are able to serve dynamic content, it’s still interesting to use some of those services).</p>
+<p>Now that you know the <em>whys</em>, let’s talk about the <em>hows</em>.</p>
+<h2 id="jekyll">Jekyll</h2>
+<p>There are several static page generators out there (just Google for them). I feel confident with Ruby, but the key point here was <a href="http://pages.github.com/">Github Pages</a> having automatic <a href="http://jekyllrb.com/">Jekyll</a> processing (no suprise: jekyll’s author is one of the Github founders).</p>
+<p>I must admit I am curious about <a href="http://jaspervdj.be/hakyll/">Hakyll</a> too…</p>
+<p>With jekyll, you get:</p>
+<ul>
+<li>A full templating system based on markup authoring run through <a href="http://www.liquidmarkup.org/">liquid</a>-powered templates.</li>
+<li>Syntax highlighting (through) pygments. Just install it and run with the <code>--pygments</code> option.</li>
+<li>Tagging (not directly, but easy to add).</li>
+<li>A content-based related posts feature.</li>
+</ul>
+<p>Plus, of course, the possibility to store your blog at GitHub.</p>
+<h2 id="comments-system">Comments system</h2>
+<p>There are some good reasons for using a third party comment system instead of your own (security, merging different sources, statistics…), even if you can serve dynamic content. For this blog I chose <a href="http://disqus.com/">disqus</a>, but there are others…</p>
+<h2 id="github">Github</h2>
+<p>Both the content and the templates for this blog are hosted at a Github free account, which will even let you redirect your domain. You can check the source code, fork the repo or whatever <a href="https://github.com/jarnaldich/jarnaldich.github.com">here</a>.</p>
+<h2 id="updates-as-of-feb-2013">Updates as of Feb 2013</h2>
+<p>Some other tools have sprung around github pages / Jekyll. If I started blogging now I’d probably check them out:</p>
+<ul>
+<li><a href="http://octopress.org">Octopress</a> Is built on top of Jekyll to help hackers with the boring part of setting up a bloc (css, html templates, etc…).</li>
+<li><a href="http://jekyllbootstrap.org">Jekyll bootstrap</a> Helps setting up a github pages account. There’s a new project by the same author that aims to be language agnostic called <a href="http://ruhoh.com">ruhoh</a>.</li>
+</ul>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/jekyll.html">jekyll</a>, <a href="/tags/blogging.html">blogging</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2011/07/01/first-post.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+
+                </div>
+            </div>
+        </div>
+
+        <script>
+          (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+                  ga('create', 'UA-6838480-2', 'jarnaldich.me');
+                    ga('send', 'pageview');
+
+        </script>
+
+
+    </body>
+</html>

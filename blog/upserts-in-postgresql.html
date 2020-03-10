@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <title>Joan Arnaldich - Upserts in PosgreSQL</title>
+
+        <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
+
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
+    </head>
+    <body>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <div class="page-header">
+                        <h1>Joan
+                        Arnaldich<sup class="sup-title">(.me)</sup></h1>
+
+                        <div style="margin-top:20px;">
+                            <div class="row">
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <h1>Upserts in PosgreSQL</h1>
+
+<small>Posted on August 26, 2015 <a href="/blog/2015/08/26/upserts-in-postgresql.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>Note: most of the content of this article is already in <a href="http://www.depesz.com/2012/06/10/why-is-upsert-so-complicated/">this blog post</a>, which is far more detailed. I’m just writing this for people who want to get directly to the solution and do not care for Perl code.</p>
+<h2 id="what-is-it">What is it?</h2>
+<p>As its name suggests, it is something that combines the functionality of an insert and an update.</p>
+<p>Like when:</p>
+<ol type="1">
+<li>You want to update a field of a record if it exists, or insert it with that field value if it does not.</li>
+<li>You have a process that inserts incrementally into a DB table, in which you may want to make sure that a certain record exists, and do not want to fail with a duplicate key error if it is already there (you are using the database as a <code>set</code> or <code>bag</code> data structure).</li>
+<li>A generalization of 1: you want to update a field of a record with a function of the old value (eg. incrementing), or assign it a default value if the record does not exist.</li>
+</ol>
+<h2 id="ok.-how-can-i-do-this">Ok. How can I do this?</h2>
+<p>Well, first thing is to check your PostgreSQL version. Versions 9.5 will have this functionality built-in (as many other RDBMS do) through the use of the <code>INSERT ... ON CONFLICT</code> clause. See the <a href="https://wiki.postgresql.org/wiki/UPSERT">discussion</a>.</p>
+<p>At the time of writing this, 9.5 is not available, and anyway many of us are forced to work with legacy versions, so here I will discuss a couple of ways to achive this functionality. Notice that geting this right is not easy, since concurrency and transaction issues must be taken into account. In particular, doing this in your code:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1"></a><span class="cf">if</span> (<span class="kw">SELECT</span> whatever <span class="kw">to</span> <span class="kw">check</span> <span class="cf">if</span> <span class="dt">record</span> <span class="kw">exists</span>)</span>
+<span id="cb1-2"><a href="#cb1-2"></a>    <span class="kw">UPDATE</span> it</span>
+<span id="cb1-3"><a href="#cb1-3"></a><span class="cf">else</span> </span>
+<span id="cb1-4"><a href="#cb1-4"></a>   <span class="kw">INSERT</span> IT</span></code></pre></div>
+<p>or alternatively,</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1"></a><span class="cf">if</span>(<span class="kw">UPDATE</span> affects one <span class="kw">or</span> more records) </span>
+<span id="cb2-2"><a href="#cb2-2"></a>  <span class="co">-- we&#39;re done</span></span>
+<span id="cb2-3"><a href="#cb2-3"></a><span class="cf">else</span> </span>
+<span id="cb2-4"><a href="#cb2-4"></a>  <span class="kw">INSERT</span> <span class="dt">record</span>;</span></code></pre></div>
+<p>Will not work even inside a transaction. The default isolation level for transactions will only guarantee that other connections do not see your intermediate changes and that all of your changes succed or fail at once. (That is, the A(tomic) and I(solated) in ACID). If two different transactions query the db concurrently for a new ID, they might both get the same ID, and the transaction will fail. Setting the transaction level to SERIALIZABLE would work (think of transactions running inside a mutual exclusion region), but the application code should be ready to retry the transaction.</p>
+<h2 id="the-general-solutions">The general solution(s)</h2>
+<p>So if you want a general solution that works for all of the 3 cases stated previously, you should probably write a stored procedure in the DB like the <a href="http://www.postgresql.org/docs/current/static/plpgsql-control-structures.html#PLPGSQL-UPSERT-EXAMPLE">documentation suggests</a>:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> db (a <span class="dt">INT</span> <span class="kw">PRIMARY</span> <span class="kw">KEY</span>, b TEXT);</span>
+<span id="cb3-2"><a href="#cb3-2"></a></span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">CREATE</span> <span class="kw">FUNCTION</span> merge_db(<span class="kw">key</span> <span class="dt">INT</span>, <span class="kw">data</span> TEXT) RETURNS VOID <span class="kw">AS</span></span>
+<span id="cb3-4"><a href="#cb3-4"></a>$$</span>
+<span id="cb3-5"><a href="#cb3-5"></a><span class="cf">BEGIN</span></span>
+<span id="cb3-6"><a href="#cb3-6"></a>    <span class="cf">LOOP</span></span>
+<span id="cb3-7"><a href="#cb3-7"></a>        <span class="co">-- first try to update the key</span></span>
+<span id="cb3-8"><a href="#cb3-8"></a>        <span class="kw">UPDATE</span> db <span class="kw">SET</span> b <span class="op">=</span> <span class="kw">data</span> <span class="kw">WHERE</span> a <span class="op">=</span> <span class="kw">key</span>;</span>
+<span id="cb3-9"><a href="#cb3-9"></a>        <span class="cf">IF</span> found <span class="cf">THEN</span></span>
+<span id="cb3-10"><a href="#cb3-10"></a>            <span class="kw">RETURN</span>;</span>
+<span id="cb3-11"><a href="#cb3-11"></a>        <span class="cf">END</span> <span class="cf">IF</span>;</span>
+<span id="cb3-12"><a href="#cb3-12"></a>        <span class="co">-- not there, so try to insert the key</span></span>
+<span id="cb3-13"><a href="#cb3-13"></a>        <span class="co">-- if someone else inserts the same key concurrently,</span></span>
+<span id="cb3-14"><a href="#cb3-14"></a>        <span class="co">-- we could get a unique-key failure</span></span>
+<span id="cb3-15"><a href="#cb3-15"></a>        <span class="cf">BEGIN</span></span>
+<span id="cb3-16"><a href="#cb3-16"></a>            <span class="kw">INSERT</span> <span class="kw">INTO</span> db(a,b) <span class="kw">VALUES</span> (<span class="kw">key</span>, <span class="kw">data</span>);</span>
+<span id="cb3-17"><a href="#cb3-17"></a>            <span class="kw">RETURN</span>;</span>
+<span id="cb3-18"><a href="#cb3-18"></a>        <span class="kw">EXCEPTION</span> <span class="cf">WHEN</span> unique_violation <span class="cf">THEN</span></span>
+<span id="cb3-19"><a href="#cb3-19"></a>            <span class="co">-- Do nothing, and loop to try the UPDATE again.</span></span>
+<span id="cb3-20"><a href="#cb3-20"></a>        <span class="cf">END</span>;</span>
+<span id="cb3-21"><a href="#cb3-21"></a>    <span class="cf">END</span> <span class="cf">LOOP</span>;</span>
+<span id="cb3-22"><a href="#cb3-22"></a><span class="cf">END</span>;</span>
+<span id="cb3-23"><a href="#cb3-23"></a>$$</span>
+<span id="cb3-24"><a href="#cb3-24"></a>LANGUAGE plpgsql;</span>
+<span id="cb3-25"><a href="#cb3-25"></a></span>
+<span id="cb3-26"><a href="#cb3-26"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;david&#39;</span>);</span>
+<span id="cb3-27"><a href="#cb3-27"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;dennis&#39;</span>);</span></code></pre></div>
+<p>This solution has the advantage of delegating db-specific code into the DB and simplifying the SQL queries on the application side.</p>
+<h3 id="other-options">Other options</h3>
+<ul>
+<li>Coding in the application instead of the DB. Doing the same in client code is trickier and depends on the language and database acess layer and involves the use of SAVEPOINTS .Again, check <a href="http://www.depesz.com/2012/06/10/why-is-upsert-so-complicated/">the original article</a> for a Perl example.</li>
+<li>Locking a table. It is safe but slow.</li>
+<li>Using <a href="http://www.postgresql.org/docs/current/interactive/explicit-locking.html#ADVISORY-LOCKS">advisory locks</a> will work and have good performance, but can lead to the same kind of problems that other in-process concurrency primitives (like mutexes, semaphores) have (eg. forgetting to acquire a lock). These problems could be minimized by a sound application db access layer.</li>
+</ul>
+<h2 id="partial-solutions">Partial solutions</h2>
+<p>If you know in advance that your process will not run concurrently, then all of the above can be greatly simplified. For example, if just want to make sure that a record exists in the db (and not fail with a duplicate key entry the second time), a combination of an INSERT and a SELECT will work, making use of the fact that INSERTS will accept a sub-SELECT instead of a VALUES clause:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> TEST (whatever, counter)</span>
+<span id="cb4-2"><a href="#cb4-2"></a>    <span class="kw">SELECT</span> <span class="dv">123</span>, <span class="dv">1</span> <span class="kw">WHERE</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> (<span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> test <span class="kw">WHERE</span> whatever <span class="op">=</span> <span class="dv">123</span>);</span></code></pre></div>
+<p>… that is more concise, but not that different from checking the DB state inside the application code.</p>
+<p><a href="http://www.the-art-of-web.com/sql/upsert/">see</a></p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/sql.html">sql</a>, <a href="/tags/postgresql.html">postgresql</a>, <a href="/tags/upsert.html">upsert</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2015/08/26/upserts-in-postgresql.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+
+                </div>
+            </div>
+        </div>
+
+        <script>
+          (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+                  ga('create', 'UA-6838480-2', 'jarnaldich.me');
+                    ga('send', 'pageview');
+
+        </script>
+
+
+    </body>
+</html>
