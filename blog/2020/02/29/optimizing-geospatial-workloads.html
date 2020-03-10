@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <title>Joan Arnaldich - Optimizing Geospatial Workloads</title>
+
+        <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
+
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
+    </head>
+    <body>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <div class="page-header">
+                        <h1>Joan
+                        Arnaldich<sup class="sup-title">(.me)</sup></h1>
+
+                        <div style="margin-top:20px;">
+                            <div class="row">
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <h1>Optimizing Geospatial Workloads</h1>
+
+<small>Posted on February 29, 2020 <a href="/blog/2020/02/29/optimizing-geospatial-workloads.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>Large area geospatial processing often involves splitting into smaller working tiles to be processed or downloaded independently. As an example, 25cm resolution orthophoto production in Catalonia is divided into 4275 rectangular tiles, as seen in the following image.</p>
+<figure>
+<img src="/images/tiles5k.png" title="Orthophoto Tiling" class="center" alt="" /><figcaption> </figcaption>
+</figure>
+<p>Whenever a process can be applied to those tiles independently (ie, not depending on their neighborhood), parallel processing is an easy way to increase the throughput. In such environments, the total workload has to be distributed among a fixed, often limited, number of processing units (be they cores or computers). If the scheduling mechanism requires a predefined batch to be assigned to each core (or if there is no scheduling mechanism at all), and when the processing units are of similar processing power, then the maximum speedup is attained when all batches have an equal amount of tiles.</p>
+<p>Furthermore, since the result often has to be mosaicked in order to inspect it, or to aggregate it into a larger final product, it is desireable for the different batches to keep a spatial continuity, ideally conforming axis parallel rectangles, since that is the basic form of georeference for geospatial imagery once projected.</p>
+<h2 id="the-problem">The problem</h2>
+<p>This is a discrete optimization problem, which can be solved using the regular machinery. Since I have been dusting off my <a href="https://www.minizinc.org">MiniZinc</a> abilities through Coursera’s discrete optimization series, I decided to give it a go.</p>
+<h3 id="tile-scheme-representation">Tile scheme representation</h3>
+<p>For convenience, the list of valid tiles can be read from an external <code>.dzn</code> data file.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb1-1"><a href="#cb1-1"></a>ntiles = <span class="fl">4275</span>;</span>
+<span id="cb1-2"><a href="#cb1-2"></a>Tiles  = [| <span class="fl">253</span>, <span class="fl">055</span></span>
+<span id="cb1-3"><a href="#cb1-3"></a>          | <span class="fl">254</span>, <span class="fl">055</span></span>
+<span id="cb1-4"><a href="#cb1-4"></a>          | <span class="fl">253</span>, <span class="fl">056</span></span>
+<span id="cb1-5"><a href="#cb1-5"></a>          | <span class="fl">254</span>, <span class="fl">056</span></span>
+<span id="cb1-6"><a href="#cb1-6"></a>          | <span class="fl">255</span>, <span class="fl">055</span></span>
+<span id="cb1-7"><a href="#cb1-7"></a>          | <span class="fl">255</span>, <span class="fl">056</span></span>
+<span id="cb1-8"><a href="#cb1-8"></a>          | <span class="fl">256</span>, <span class="fl">056</span></span>
+<span id="cb1-9"><a href="#cb1-9"></a>          | <span class="fl">257</span>, <span class="fl">056</span></span>
+<span id="cb1-10"><a href="#cb1-10"></a>          | <span class="fl">252</span>, <span class="fl">059</span></span>
+<span id="cb1-11"><a href="#cb1-11"></a>          …</span>
+<span id="cb1-12"><a href="#cb1-12"></a>          |];</span></code></pre></div>
+<p>The above basically declares the list of valid tiles as a 2d array with <code>ntiles</code> rows and 2 columns. Then, in our model file (<code>.mzn</code>) the data will be loaded into the <code>Tiles</code> constant array, declared as follows:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">int</span>: ntiles;</span>
+<span id="cb2-2"><a href="#cb2-2"></a></span>
+<span id="cb2-3"><a href="#cb2-3"></a><span class="kw">enum</span> e_tile = { col, row };</span>
+<span id="cb2-4"><a href="#cb2-4"></a><span class="kw">array</span>[<span class="fl">1</span>..ntiles, e_tile ] <span class="kw">of</span> <span class="kw">int</span>: Tiles;</span></code></pre></div>
+<p>Notice the use of a column enum to make access easier.</p>
+<p>From the above data, a 2d grid can be built within the bounds of minimum and maximum columns, where the grid value is <code>true</code> if there exists a tile in that position, and <code>false</code> otherwise. This builds a nice representation for modelling the spatial restrictions in the problem.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">int</span>: mincol = <span class="kw">min</span>([ Tiles[i, ocol] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">int</span>: maxcol = <span class="kw">max</span>([ Tiles[i, ocol] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">int</span>: minrow = <span class="kw">min</span>([ Tiles[i, orow] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-4"><a href="#cb3-4"></a><span class="kw">int</span>: maxrow = <span class="kw">max</span>([ Tiles[i, orow] | i <span class="kw">in</span> <span class="fl">1</span>..ntiles ]);</span>
+<span id="cb3-5"><a href="#cb3-5"></a></span>
+<span id="cb3-6"><a href="#cb3-6"></a><span class="kw">array</span>[minrow..maxrow, mincol..maxcol] <span class="kw">of</span> <span class="kw">int</span>: Grid =</span>
+<span id="cb3-7"><a href="#cb3-7"></a>  <span class="kw">array2d</span>(minrow..maxrow, mincol..maxcol,</span>
+<span id="cb3-8"><a href="#cb3-8"></a>     [ <span class="cf">exists</span>(i <span class="kw">in</span> <span class="fl">1</span>..ntiles)(Tiles[i, orow] == r /\ Tiles[i, ocol] == c)</span>
+<span id="cb3-9"><a href="#cb3-9"></a>       | r <span class="kw">in</span> minrow..maxrow, c <span class="kw">in</span> mincol..maxcol ]);</span></code></pre></div>
+<p>Note that all this is computed at compile time, before the actual optimization begins.</p>
+<h3 id="box-representation">Box representation</h3>
+<p>Boxes are rectangles defined defined by their left, bottom and top bounds:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">int</span>: nboxes;</span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="kw">enum</span> e_bbox  = { top, left, bottom, right };</span>
+<span id="cb4-3"><a href="#cb4-3"></a><span class="kw">array</span>[<span class="fl">1</span>..nboxes, e_bbox] <span class="kw">of</span> <span class="kw">var</span> <span class="kw">int</span>: Boxes;</span></code></pre></div>
+<p>Grid positions increase like in a matrix (first row top, left column first), and their bounds are constrained within the tile grid limits. Limits are inclusive. These requirements can be expressed as a minizinc <code>constraint</code>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb5-1"><a href="#cb5-1"></a><span class="kw">constraint</span></span>
+<span id="cb5-2"><a href="#cb5-2"></a>  forall(b <span class="kw">in</span> <span class="fl">1</span>..nboxes) (</span>
+<span id="cb5-3"><a href="#cb5-3"></a>      mincol &lt;= Boxes[b, left] /\ Boxes[b, left]  &lt;= maxcol /\</span>
+<span id="cb5-4"><a href="#cb5-4"></a>      minrow &lt;= Boxes[b, top] /\ Boxes[b, top] &lt;= maxcol /\</span>
+<span id="cb5-5"><a href="#cb5-5"></a>      Boxes[b, left] &lt;= Boxes[b, right] /\</span>
+<span id="cb5-6"><a href="#cb5-6"></a>      Boxes[b, top] &lt;= Boxes[b, bottom]);</span></code></pre></div>
+<p>Each tile belongs to just one box, so boxes do not overlap.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb6-1"><a href="#cb6-1"></a><span class="kw">predicate</span> no_overlap(<span class="kw">var</span> <span class="kw">int</span>:l1, <span class="kw">var</span> <span class="kw">int</span>:t1, <span class="kw">var</span> <span class="kw">int</span>:b1, <span class="kw">var</span> <span class="kw">int</span>:r1,</span>
+<span id="cb6-2"><a href="#cb6-2"></a>                     <span class="kw">var</span> <span class="kw">int</span>:l2, <span class="kw">var</span> <span class="kw">int</span>:t2, <span class="kw">var</span> <span class="kw">int</span>:b2, <span class="kw">var</span> <span class="kw">int</span>:r2) =</span>
+<span id="cb6-3"><a href="#cb6-3"></a>   r1 &lt; l2 \/ l1 &gt; r2 \/ b1 &lt; t2 \/ t1 &gt; b2 \/</span>
+<span id="cb6-4"><a href="#cb6-4"></a>   r2 &lt; l1 \/ l2 &gt; r1 \/ b2 &lt; t1 \/ t2 &gt; b1;</span>
+<span id="cb6-5"><a href="#cb6-5"></a></span>
+<span id="cb6-6"><a href="#cb6-6"></a><span class="kw">constraint</span> </span>
+<span id="cb6-7"><a href="#cb6-7"></a>forall(b1,b2 <span class="kw">in</span> <span class="fl">1</span>..nboxes where b1 &lt; b2) (</span>
+<span id="cb6-8"><a href="#cb6-8"></a>    no_overlap(</span>
+<span id="cb6-9"><a href="#cb6-9"></a>     	Boxes[b1, left], Boxes[b1, top], Boxes[b1, bottom], Boxes[b1, right],</span>
+<span id="cb6-10"><a href="#cb6-10"></a>	    Boxes[b2, left], Boxes[b2, top], Boxes[b2, bottom], Boxes[b2, right]));</span></code></pre></div>
+<h3 id="assignment">Assignment</h3>
+<p>In the end we want an array relating every tile with its box. Since we chose to represent a tile by its row and column, this can be modeled as a 2d array of <code>nboxes</code>. We will reserve a special 0 value for the empty tiles within the grid.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb7-1"><a href="#cb7-1"></a><span class="kw">array</span>[minrow..maxrow, mincol..maxcol] <span class="kw">of</span> <span class="kw">var</span> <span class="fl">0</span>..nboxes: Assignment;</span></code></pre></div>
+<p>The rules that relate the tile Grid with the Boxes and Assignment vector can be enumerated as follows:</p>
+<ol type="1">
+<li>Every tile inside the range of a box is assigned to it.</li>
+<li>Tiles not present are not assigned.</li>
+<li>Tiles not assigned to a box, but present, are assigned to another box.</li>
+</ol>
+<div class="sourceCode" id="cb8"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb8-1"><a href="#cb8-1"></a><span class="kw">constraint</span></span>
+<span id="cb8-2"><a href="#cb8-2"></a>  forall(b <span class="kw">in</span> <span class="fl">1</span>..nboxes) (</span>
+<span id="cb8-3"><a href="#cb8-3"></a>      forall(r <span class="kw">in</span> minrow..maxrow) (</span>
+<span id="cb8-4"><a href="#cb8-4"></a>          forall(c <span class="kw">in</span> mincol..maxcol) (</span>
+<span id="cb8-5"><a href="#cb8-5"></a>            if Grid[r,c] &gt; <span class="fl">0</span> then</span>
+<span id="cb8-6"><a href="#cb8-6"></a>              if contains(Boxes[b, left], Boxes[b, top],</span>
+<span id="cb8-7"><a href="#cb8-7"></a>                          Boxes[b, bottom], Boxes[b, right],</span>
+<span id="cb8-8"><a href="#cb8-8"></a>                          r, c)Ti</span>
+<span id="cb8-9"><a href="#cb8-9"></a>              then</span>
+<span id="cb8-10"><a href="#cb8-10"></a>                <span class="co">% 1 - Tiles within the range of a box are assigned to it</span></span>
+<span id="cb8-11"><a href="#cb8-11"></a>                Assignment[r,c] = b</span>
+<span id="cb8-12"><a href="#cb8-12"></a>              else</span>
+<span id="cb8-13"><a href="#cb8-13"></a>                <span class="co">% 3 - Tiles not assigned to a box are assigned to another</span></span>
+<span id="cb8-14"><a href="#cb8-14"></a>                Assignment[r,c] != b /\ Assignment[r,c] &gt; <span class="fl">0</span></span>
+<span id="cb8-15"><a href="#cb8-15"></a>              endif</span>
+<span id="cb8-16"><a href="#cb8-16"></a>            else</span>
+<span id="cb8-17"><a href="#cb8-17"></a>              <span class="co">% 2 - Tiles not present are not assigned</span></span>
+<span id="cb8-18"><a href="#cb8-18"></a>              Assignment[r,c] = <span class="fl">0</span></span>
+<span id="cb8-19"><a href="#cb8-19"></a>            endif)));</span></code></pre></div>
+<h3 id="objective-function">Objective function</h3>
+<p>We want to make the resulting rectangles as equal as possible. In order to do so, we have to gather the cardinalities of each box.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb9-1"><a href="#cb9-1"></a><span class="kw">array</span>[<span class="fl">1</span>..nboxes] <span class="kw">of</span> <span class="kw">var</span> <span class="kw">int</span>: BoxCardinality =</span>
+<span id="cb9-2"><a href="#cb9-2"></a>  [ sum(r <span class="kw">in</span> minrow..maxrow, c <span class="kw">in</span> mincol..maxcol)(Grid[r,c] &gt; <span class="fl">0</span> /\ Assignment[r,c] == b) | b <span class="kw">in</span> <span class="fl">1</span>..nboxes];</span></code></pre></div>
+<p>This can be done by minimizing the variance, which is the same as minimizing the square L2 norm (dot product of a vector with itself).</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb10-1"><a href="#cb10-1"></a><span class="kw">var</span> <span class="kw">int</span>: variance = sum(b <span class="kw">in</span> <span class="fl">1</span>..nboxes)(BoxCardinality[b]*BoxCardinality[b]);</span>
+<span id="cb10-2"><a href="#cb10-2"></a>solve minimize variance;</span></code></pre></div>
+<h3 id="showing-the-results">Showing the results</h3>
+<p>It is useful to dump the result in some format that can be easily parsed by standard command-line tools, since some models have to be further processed. In this case, the lines corresponding to the assignment vector are prefixed with the tag <code>Tiles</code> to make them easy to redirect to another file.</p>
+<p>The printing itself can be done with a combination of helper functions and array comprehensions.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb11-1"><a href="#cb11-1"></a>function string: show_assignment(<span class="kw">int</span>: r, <span class="kw">int</span>: c) = &quot;Tile: &quot; ++ show(c) ++ &quot;-&quot; ++ show(r) ++ &quot;,&quot; ++ show(Assignment[r,c]) ++ &quot;\n&quot;;</span>
+<span id="cb11-2"><a href="#cb11-2"></a></span>
+<span id="cb11-3"><a href="#cb11-3"></a>output </span>
+<span id="cb11-4"><a href="#cb11-4"></a>  [ show_assignment(r,c) | r <span class="kw">in</span> minrow..maxrow, c <span class="kw">in</span> mincol..maxcol where Grid[r,c] &gt; <span class="fl">0</span> ] ++ </span>
+<span id="cb11-5"><a href="#cb11-5"></a>  [ &quot;Variance: &quot;, show(variance), &quot;\n&quot;,</span>
+<span id="cb11-6"><a href="#cb11-6"></a>    &quot;Box Cardinalities: &quot;,  show(BoxCardinality) , &quot;\n&quot; ];</span></code></pre></div>
+<p>For powershell users, this could be captured, for example:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb12-1"><a href="#cb12-1"></a><span class="va">$ENV</span>:FLATZINC_CMD = <span class="st">&quot;fzn-gecode&quot;</span></span>
+<span id="cb12-2"><a href="#cb12-2"></a><span class="va">$Env</span>:PATH += <span class="st">&quot;;D:\Soft\MiniZinc\&quot;</span></span>
+<span id="cb12-3"><a href="#cb12-3"></a>minizinc.<span class="fu">exe</span> -I D:\Soft\MiniZinc\share\minizinc\gecode\ .\tall5m.<span class="fu">mzn</span> .\tall5m.<span class="fu">dzn</span> | ? { <span class="va">$_</span> -match <span class="st">&quot;Ortho: &quot;</span> } | % { <span class="va">$_</span> -replace <span class="st">&quot;Ortho: &quot;</span> } | <span class="fu">out-file</span> -encoding ascii assign5.<span class="fu">csv</span></span></code></pre></div>
+<h3 id="not-so-fast">Not so fast!</h3>
+<p>For big grids, the process is too slow (on my hardware, ymmv). A practical way to mitigate that problem is including further “artificial” restrictions that capture some common-sense knowledge. Here we can set that box cardinalities belong to an environment around a <em>perfect</em> one, which would happen when every box has <code>ntiles / nboxes</code> tiles.</p>
+<p>We can define a parameter <code>slack</code>, that will represent the radius of the environment, and add the following constraint:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode minizinc"><code class="sourceCode minizinc"><span id="cb13-1"><a href="#cb13-1"></a><span class="co">% All boxes have at least one tile assigned to it</span></span>
+<span id="cb13-2"><a href="#cb13-2"></a><span class="kw">float</span>: fill_factor = (ntiles / nboxes);</span>
+<span id="cb13-3"><a href="#cb13-3"></a></span>
+<span id="cb13-4"><a href="#cb13-4"></a><span class="kw">constraint</span></span>
+<span id="cb13-5"><a href="#cb13-5"></a>   forall(b <span class="kw">in</span> <span class="fl">1</span>..nboxes) ( (<span class="fl">1.0</span> - slack)*fill_factor &lt;= BoxCardinality[b] /\ BoxCardinality[b] &lt;= (<span class="fl">1.0</span> + slack)*fill_factor ) ; </span></code></pre></div>
+<p>This is common in discrete optimization problems, where a hybrid system can be developed. In this case, we could use some sort of search to optimize for the value of the slack, with different invocations of minizinc.</p>
+<h2 id="results">Results</h2>
+<p>By processing the results of minizinc and joining the results into a <a href="https://www.qgis.org">QGis</a> project, we can easily map the box assignment. Here is the result for 4 boxes:</p>
+<p><img src="/images/tiles5k_colored.png" title="Orthophoto Tiling" class="center" /></p>
+<p>For 8 boxes (8 parallel processors), the result would be:</p>
+<p><img src="/images/tiles5k_8box_colored.png" title="Orthophoto Tiling" class="center" /></p>
+<h2 id="conclusions">Conclusions</h2>
+<p>Even when I know the basic theory behind mixed integer and fp solvers (even implemented a simplex-based solver as a practical exercise in the past), I keep having the feeling there is some form of magic at work here.</p>
+<p>There are lots of other ways to model this problem. In particular, MiniZinc has special primitives for dealing with sets. Some of the restriction explicitly stated by the model are already available for reuse in the <code>globals</code> library, which would probably more efficient and would lead to terser code. I would like to rewrite the model using these functions and compare their efficiency if I ever have the time.</p>
+<p>For now, I got my results!</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/geospatial.html">geospatial</a>, <a href="/tags/minizinc.html">minizinc</a>, <a href="/tags/optimization.html">optimization</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2020/02/29/optimizing-geospatial-workloads.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+
+                </div>
+            </div>
+        </div>
+
+        <script>
+          (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+                })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+                  ga('create', 'UA-6838480-2', 'jarnaldich.me');
+                    ga('send', 'pageview');
+
+        </script>
+
+
+    </body>
+</html>

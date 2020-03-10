@@ -10,7 +10,11 @@
               rel="stylesheet">
 
         <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
-       <link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+
+	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
+
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
         <link rel="stylesheet" type="text/css" href="/css/custom.css" />
         <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
@@ -60,35 +64,34 @@
 <h1 id="the-task">The Task</h1>
 <p>A quick and dirty way to monitor the progress of a batch process is probing the number of output files in a directory at regular intervals and maybe save that to a file eg. for plotting, statistics, etc…</p>
 <p>It is quite probable that a developer would come up with a solution very much like the function below:</p>
-<pre class="powershell"><code>function Sample-Count-Files {
-    [CmdletBinding()]
-
-    param(
-        # The file pattern to count
-        [Parameter(Mandatory=$true, 
-                   Position=0)]
-        [string]$pattern,
-
-        # Name of the log file
-        [Parameter(Mandatory=$true, 
-            Position=1)]
-        [string]$logfile,
-
-        # Seconds interval between samples
-        [Parameter(Mandatory=$true, 
-            Position=2)]
-        [int]$seconds)
-
-    While($true) {
-        sleep $seconds;
-        $cnt = (dir $pattern).Count;
-        $d = Get-Date;
-        $d.ToString(&quot;yyyy-MM-dd HH:mm:ss&quot;) + &quot;`t$cnt&quot; | Out-File $logfile -encoding ascii -Append -ob 0
-    }
-}
-</code></pre>
+<div class="sourceCode" id="cb1"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">function</span> Sample-Count-Files {</span>
+<span id="cb1-2"><a href="#cb1-2"></a>    [CmdletBinding()]</span>
+<span id="cb1-3"><a href="#cb1-3"></a></span>
+<span id="cb1-4"><a href="#cb1-4"></a>    <span class="kw">param</span>(</span>
+<span id="cb1-5"><a href="#cb1-5"></a>        <span class="co"># The file pattern to count</span></span>
+<span id="cb1-6"><a href="#cb1-6"></a>        [Parameter(Mandatory=<span class="va">$true</span>, </span>
+<span id="cb1-7"><a href="#cb1-7"></a>                   Position=0)]</span>
+<span id="cb1-8"><a href="#cb1-8"></a>        [<span class="dt">string</span>]<span class="va">$pattern</span>,</span>
+<span id="cb1-9"><a href="#cb1-9"></a></span>
+<span id="cb1-10"><a href="#cb1-10"></a>        <span class="co"># Name of the log file</span></span>
+<span id="cb1-11"><a href="#cb1-11"></a>        [Parameter(Mandatory=<span class="va">$true</span>, </span>
+<span id="cb1-12"><a href="#cb1-12"></a>            Position=1)]</span>
+<span id="cb1-13"><a href="#cb1-13"></a>        [<span class="dt">string</span>]<span class="va">$logfile</span>,</span>
+<span id="cb1-14"><a href="#cb1-14"></a></span>
+<span id="cb1-15"><a href="#cb1-15"></a>        <span class="co"># Seconds interval between samples</span></span>
+<span id="cb1-16"><a href="#cb1-16"></a>        [Parameter(Mandatory=<span class="va">$true</span>, </span>
+<span id="cb1-17"><a href="#cb1-17"></a>            Position=2)]</span>
+<span id="cb1-18"><a href="#cb1-18"></a>        [<span class="dt">int</span>]<span class="va">$seconds</span>)</span>
+<span id="cb1-19"><a href="#cb1-19"></a></span>
+<span id="cb1-20"><a href="#cb1-20"></a>    <span class="kw">While</span>(<span class="va">$true</span>) {</span>
+<span id="cb1-21"><a href="#cb1-21"></a>        <span class="fu">sleep</span> <span class="va">$seconds</span>;</span>
+<span id="cb1-22"><a href="#cb1-22"></a>        <span class="va">$cnt</span> = (<span class="fu">dir</span> <span class="va">$pattern</span>).<span class="fu">Count</span>;</span>
+<span id="cb1-23"><a href="#cb1-23"></a>        <span class="va">$d</span> = <span class="fu">Get-Date</span>;</span>
+<span id="cb1-24"><a href="#cb1-24"></a>        <span class="va">$d</span>.<span class="fu">ToString</span>(<span class="st">&quot;yyyy-MM-dd HH:mm:ss&quot;</span>) + <span class="st">&quot;`t$cnt&quot;</span> | <span class="fu">Out-File</span> <span class="va">$logfile</span> -encoding ascii -Append -ob 0</span>
+<span id="cb1-25"><a href="#cb1-25"></a>    }</span>
+<span id="cb1-26"><a href="#cb1-26"></a>}</span></code></pre></div>
 <p>That is, an infinte loop which waits for a number of seconds before counting the output files and outputting a line with the date and result. Executing the above code will block the console, so to monitor progress you can always wrap it into a <code>PSJob</code> or open a new console and then just tail the file:</p>
-<pre class="powershell"><code>gc -tail 10 -Wait samples.tsv</code></pre>
+<div class="sourceCode" id="cb2"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb2-1"><a href="#cb2-1"></a><span class="fu">gc</span> -tail 10 -Wait samples.<span class="fu">tsv</span></span></code></pre></div>
 <p>I suspect most developers that have not dealt with Unix scripting would come up with something along the lines of this. Conversely, my bet is any experienced Unix scripter would frown upon it, feeling the script is trying to do <em>too much</em>. In particular, it is in charge of:</p>
 <ul>
 <li><strong>The When</strong>: The counting is done every <em>n</em> seconds.</li>
@@ -97,41 +100,40 @@
 </ul>
 <p>These three pieces of functionality are coupled in our function, and they would’nt need to be so. For example, separating the <em>when</em> from the <em>what</em> would allow us to fire <em>any action</em> every <em>n</em> seconds.</p>
 <p>This is indeed not difficult in PowerShell, see:</p>
-<pre class="powershell"><code>function Tick {
-    [CmdletBinding()]
-    Param([Parameter(Mandatory=$true, Position=0)][int]$Seconds)
-    Process {
-        while($true) { 
-            Start-Sleep -Seconds $Seconds
-            Get-Date
-        }    
-    }
-}</code></pre>
+<div class="sourceCode" id="cb3"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">function</span> Tick {</span>
+<span id="cb3-2"><a href="#cb3-2"></a>    [CmdletBinding()]</span>
+<span id="cb3-3"><a href="#cb3-3"></a>    <span class="kw">Param</span>([Parameter(Mandatory=<span class="va">$true</span>, Position=0)][<span class="dt">int</span>]<span class="va">$Seconds</span>)</span>
+<span id="cb3-4"><a href="#cb3-4"></a>    <span class="kw">Process</span> {</span>
+<span id="cb3-5"><a href="#cb3-5"></a>        <span class="kw">while</span>(<span class="va">$true</span>) { </span>
+<span id="cb3-6"><a href="#cb3-6"></a>            <span class="fu">Start-Sleep</span> -Seconds <span class="va">$Seconds</span></span>
+<span id="cb3-7"><a href="#cb3-7"></a>            <span class="fu">Get-Date</span></span>
+<span id="cb3-8"><a href="#cb3-8"></a>        }    </span>
+<span id="cb3-9"><a href="#cb3-9"></a>    }</span>
+<span id="cb3-10"><a href="#cb3-10"></a>}</span></code></pre></div>
 <p>This <code>CmdLet</code> waits for a number of seconds before sending a <code>Date</code> object downstream to do whatever we please with it, and loops (mind it is inside the <code>Process</code> section). It is like a pulse generating objects at regular intervals, so now we can reuse the <em>when</em> in different contexts:</p>
-<pre class="powershell"><code>Tick 10 | % { $_ }</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb4-1"><a href="#cb4-1"></a>Tick 10 | % { <span class="va">$_</span> }</span></code></pre></div>
 <p>We can write a similar function for the <em>what</em>. In a real scenario we probably would just write a one-liner, because our code is so simple, but in this post we will go the full way. As a bonus, instead of working with strings, we demonstrate how to pass custom objects down the pipeline. Here, we create an object with two members: the time and the file count.</p>
-<pre class="powershell"><code>
-function Count {
-    [CmdletBinding()]
-    Param(
-    	[Parameter(Mandatory=$true, Position=0)]
-	    [string]
-	    $Pattern,
-
-        [Parameter(Mandatory=$true, Position=1, ValueFromPipeline=$true)]
-	    $Time
-    )
-
-    Process {
-        [PSCustomObject]@{ 
-           Time=$Time; 
-           Files= $(dir $Pattern).Count 
-        }
-    }
-}
-</code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb5-1"><a href="#cb5-1"></a></span>
+<span id="cb5-2"><a href="#cb5-2"></a><span class="kw">function</span> Count {</span>
+<span id="cb5-3"><a href="#cb5-3"></a>    [CmdletBinding()]</span>
+<span id="cb5-4"><a href="#cb5-4"></a>    <span class="kw">Param</span>(</span>
+<span id="cb5-5"><a href="#cb5-5"></a>    	[Parameter(Mandatory=<span class="va">$true</span>, Position=0)]</span>
+<span id="cb5-6"><a href="#cb5-6"></a>	    [<span class="dt">string</span>]</span>
+<span id="cb5-7"><a href="#cb5-7"></a>	    <span class="va">$Pattern</span>,</span>
+<span id="cb5-8"><a href="#cb5-8"></a></span>
+<span id="cb5-9"><a href="#cb5-9"></a>        [Parameter(Mandatory=<span class="va">$true</span>, Position=1, ValueFromPipeline=<span class="va">$true</span>)]</span>
+<span id="cb5-10"><a href="#cb5-10"></a>	    <span class="va">$Time</span></span>
+<span id="cb5-11"><a href="#cb5-11"></a>    )</span>
+<span id="cb5-12"><a href="#cb5-12"></a></span>
+<span id="cb5-13"><a href="#cb5-13"></a>    <span class="kw">Process</span> {</span>
+<span id="cb5-14"><a href="#cb5-14"></a>        [PSCustomObject]@{ </span>
+<span id="cb5-15"><a href="#cb5-15"></a>           Time=<span class="va">$Time</span>; </span>
+<span id="cb5-16"><a href="#cb5-16"></a>           Files= $(<span class="fu">dir</span> <span class="va">$Pattern</span>).<span class="fu">Count</span> </span>
+<span id="cb5-17"><a href="#cb5-17"></a>        }</span>
+<span id="cb5-18"><a href="#cb5-18"></a>    }</span>
+<span id="cb5-19"><a href="#cb5-19"></a>}</span></code></pre></div>
 <p>For the output, we could write our own function again, but it turns out there already is a Powershell function that formats objects into CSV files, conveniently named <code>Export-Csv</code>. Putting it all together:</p>
-<pre class="powershell"><code>Tick 1 -ob 0 | Count *.out | Export-Csv times.csv</code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb6-1"><a href="#cb6-1"></a>Tick 1 -ob 0 | Count *.<span class="fu">out</span> | <span class="fu">Export-Csv</span> times.<span class="fu">csv</span></span></code></pre></div>
 <p>Which is clean, easy to understand and easy to reuse, just like good <em>Unix</em> scripting is supposed to. By the way, if you are wondering where the <code>-ob 0</code> or <code>-ObjectBuffer 0</code> came from (we did not explicitly add it to our script), that is known as a <a href="https://msdn.microsoft.com/en-us/powershell/reference/5.1/microsoft.powershell.core/about/about_commonparameters">common parameter</a>. For efficiency reasons, Powershell can wait until a bunch of objects are accumulated into a buffer before sending them downstream. Obviously that is not what we want here, so we set the buffer size to 0.</p>
 <h2 id="conclusion">Conclusion</h2>
 <p>It is often a good idea, when approaching shell scripting, to take a step back and think whether we are trying to accomplish too much at once, and which pieces of functionality we would like to reuse in the future. That is not really different from the software architecture best practices applied when programming in the large, but the abstractions (programming whith pipes and streams) are. Now Windows programmers can apply the same principles at play in Unix for decades.</p>
