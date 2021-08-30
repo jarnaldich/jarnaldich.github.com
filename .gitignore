@@ -8,3 +8,4 @@ _site
 /_src/posts/out.bmp
 /_src/posts/voronoi
 stack.yaml.lock
+apps/**/*.map

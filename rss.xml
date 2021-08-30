@@ -7,8 +7,155 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Sat, 29 Feb 2020 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Mon, 30 Aug 2021 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Introspection in PostgreSQL</title>
+    <link>http://jarnaldich.me/blog/2021/08/30/postgres-introspection.html</link>
+    <description><![CDATA[<h1>Introspection in PostgreSQL</h1>
+
+<small>Posted on August 30, 2021 <a href="/blog/2021/08/30/postgres-introspection.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p> </p>
+<figure>
+<img src="/images/introspection.png" title="Detail of Alexander Stirling Calder Introspection (c. 1935)" class="wrap" alt="" /><figcaption> </figcaption>
+</figure>
+<p>In coding, introspection refers to the ability of some systems to query and expose information on their own structure. Typical examples are being able to query an object’s methods or properties (eg. Python’s <code>___dict___</code>).</p>
+<p>In a DB system, it typically refers to the mechanism by which schema information regarding tables, attributes, foreign keys, indices, data types, etc… can be programmatically queried.</p>
+<p>This is useful in many ways, eg:</p>
+<ul>
+<li>Code reuse: making code that can be made schema-agnostic. For example, <a href="https://github.com/adrianandrei-ca/pgunit">pgunit</a>, a NUnit-style testing framework for postgresql, automatically searches for functions whose name start with <code>test_</code>.</li>
+<li>Discovery and research of the structure in ill-documented or legacy database.</li>
+</ul>
+<p>In this article we will explore some options for making use of the introspection capabilities of PostgreSQL.</p>
+<h2 id="information-schema-vs-system-catalogs">Information schema vs system catalogs</h2>
+<p>There are two main devices to query information of the objects defined in a Postgres database. The first one is the information schema, which is defined in the SQL standard and thus expected to be portable and remain stable, but cannot provide information about posgres-specific features. As with many aspects of the SQL standard, there are vendor-specific issues (most notably Oracle does not implement it out of the box). If you are using introspection as a part of a library, and do not need to get into postgres-specific information this approach gives you a better chance for future compatibility accross RDBMS and even PostgreSQL versions.</p>
+<p>The other approach involves querying the so called <a href="https://www.postgresql.org/docs/13/catalogs.html">System Catalogs</a>. These are tables belonging to the <code>pg_catalog</code> schema. For example, the <code>pg_catalog.pg_class</code> (pseudo-)table catalogs tables and most everything else that has columns or is otherwise similar to a table (views, materialized or not…). This approach is version dependent, but I would be surprised to see major changes in the near future.</p>
+<p>This is the approach we will be focusing on in this article, because the tooling and coding ergonomics from PostgreSQL are more convenient, as you will see in the nexts sections.</p>
+<h2 id="use-the-command-line-luke">Use the command-line, Luke</h2>
+<p>The <code>psql</code> command-line client is a very powerful and often overlooked utility (as many other command_-line tools). Typing <code>\?</code> after connecting will show a plethora of commands that let you inspect the DB. What most people do not know, though, is that these commands are implemented as regular SQL queries to the system catalogs and that <strong>you can actually see the code</strong> just by invoking the <code>psql</code> client with the <code>-E</code> option. For example:</p>
+<pre><code>PGPASSWORD=&lt;password&gt; psql -E -U &lt;user&gt; -h &lt;host&gt; &lt;db&gt;</code></pre>
+<p>And then typing for the description of the <code>pg__catalog.pg_class</code> table itself:</p>
+<pre><code>\dt+ pg_catalog.pg_class</code></pre>
+<p>yields:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1"></a><span class="op">*********</span> <span class="kw">QUERY</span> <span class="op">**********</span></span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">SELECT</span> n.nspname <span class="kw">as</span> <span class="ot">&quot;Schema&quot;</span>,</span>
+<span id="cb3-3"><a href="#cb3-3"></a>  c.relname <span class="kw">as</span> <span class="ot">&quot;Name&quot;</span>,</span>
+<span id="cb3-4"><a href="#cb3-4"></a>  <span class="cf">CASE</span> c.relkind </span>
+<span id="cb3-5"><a href="#cb3-5"></a>    <span class="cf">WHEN</span> <span class="st">&#39;r&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;table&#39;</span> </span>
+<span id="cb3-6"><a href="#cb3-6"></a>    <span class="cf">WHEN</span> <span class="st">&#39;v&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;view&#39;</span> </span>
+<span id="cb3-7"><a href="#cb3-7"></a>    <span class="cf">WHEN</span> <span class="st">&#39;m&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;materialized view&#39;</span> </span>
+<span id="cb3-8"><a href="#cb3-8"></a>    <span class="cf">WHEN</span> <span class="st">&#39;i&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;index&#39;</span> </span>
+<span id="cb3-9"><a href="#cb3-9"></a>    <span class="cf">WHEN</span> <span class="st">&#39;S&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;sequence&#39;</span> </span>
+<span id="cb3-10"><a href="#cb3-10"></a>    <span class="cf">WHEN</span> <span class="st">&#39;s&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;special&#39;</span> </span>
+<span id="cb3-11"><a href="#cb3-11"></a>    <span class="cf">WHEN</span> <span class="st">&#39;f&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;foreign table&#39;</span> </span>
+<span id="cb3-12"><a href="#cb3-12"></a>    <span class="cf">WHEN</span> <span class="st">&#39;p&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;partitioned table&#39;</span> </span>
+<span id="cb3-13"><a href="#cb3-13"></a>    <span class="cf">WHEN</span> <span class="st">&#39;I&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;partitioned index&#39;</span> </span>
+<span id="cb3-14"><a href="#cb3-14"></a>  <span class="cf">END</span> <span class="kw">as</span> <span class="ot">&quot;Type&quot;</span>,</span>
+<span id="cb3-15"><a href="#cb3-15"></a>  pg_catalog.pg_get_userbyid(c.relowner) <span class="kw">as</span> <span class="ot">&quot;Owner&quot;</span>,</span>
+<span id="cb3-16"><a href="#cb3-16"></a>  pg_catalog.pg_size_pretty(pg_catalog.pg_table_size(c.<span class="kw">oid</span>)) <span class="kw">as</span> <span class="ot">&quot;Size&quot;</span>,</span>
+<span id="cb3-17"><a href="#cb3-17"></a>  pg_catalog.obj_description(c.<span class="kw">oid</span>, <span class="st">&#39;pg_class&#39;</span>) <span class="kw">as</span> <span class="ot">&quot;Description&quot;</span></span>
+<span id="cb3-18"><a href="#cb3-18"></a><span class="kw">FROM</span> pg_catalog.pg_class c</span>
+<span id="cb3-19"><a href="#cb3-19"></a>     <span class="kw">LEFT</span> <span class="kw">JOIN</span> pg_catalog.pg_namespace n <span class="kw">ON</span> n.<span class="kw">oid</span> <span class="op">=</span> c.relnamespace</span>
+<span id="cb3-20"><a href="#cb3-20"></a><span class="kw">WHERE</span> c.relkind <span class="kw">IN</span> (<span class="st">&#39;r&#39;</span>,<span class="st">&#39;p&#39;</span>,<span class="st">&#39;s&#39;</span>,<span class="st">&#39;&#39;</span>)</span>
+<span id="cb3-21"><a href="#cb3-21"></a>      <span class="kw">AND</span> n.nspname !~ <span class="st">&#39;^pg_toast&#39;</span></span>
+<span id="cb3-22"><a href="#cb3-22"></a>  <span class="kw">AND</span> c.relname <span class="kw">OPERATOR</span>(pg_catalog.~) <span class="st">&#39;^(pg_class)$&#39;</span></span>
+<span id="cb3-23"><a href="#cb3-23"></a>  <span class="kw">AND</span> n.nspname <span class="kw">OPERATOR</span>(pg_catalog.~) <span class="st">&#39;^(pg_catalog)$&#39;</span></span>
+<span id="cb3-24"><a href="#cb3-24"></a><span class="kw">ORDER</span> <span class="kw">BY</span> <span class="dv">1</span>,<span class="dv">2</span>;</span>
+<span id="cb3-25"><a href="#cb3-25"></a><span class="op">**************************</span></span>
+<span id="cb3-26"><a href="#cb3-26"></a></span>
+<span id="cb3-27"><a href="#cb3-27"></a>                        <span class="kw">List</span> <span class="kw">of</span> relations</span>
+<span id="cb3-28"><a href="#cb3-28"></a>   <span class="kw">Schema</span>   |   Name   | <span class="kw">Type</span>  |  Owner   |  <span class="kw">Size</span>  | Description</span>
+<span id="cb3-29"><a href="#cb3-29"></a><span class="co">------------+----------+-------+----------+--------+-------------</span></span>
+<span id="cb3-30"><a href="#cb3-30"></a> pg_catalog | pg_class | <span class="kw">table</span> | postgres | <span class="dv">136</span> kB |</span>
+<span id="cb3-31"><a href="#cb3-31"></a>(<span class="dv">1</span> <span class="kw">row</span>)</span></code></pre></div>
+<p>Gives you a quite descriptive (and corner-case complete) template to start your own code from. For example, in the former query we could replace the <code>^(pg_class)$</code> regex with some other. Bear in mind that this trick is only helpful with the system catalog approach.</p>
+<h2 id="regclasses-and-oids">Regclasses and OIDs</h2>
+<p>Many objects in the system catalogs have some sort of “unique id” in the form of an <code>oid</code> attribute. It is sometimes convenient to know that you can turn descriptive names into such <code>oid</code>s by casting into the <code>regclass</code> data type.</p>
+<p>For example, in a somewhat circular turn of events, the attributes of the catalog table storing attribute information can be queried by name as:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">SELECT</span> attnum, attname, format_type(atttypid, atttypmod) <span class="kw">as</span> <span class="ot">&quot;Type&quot;</span> </span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="kw">FROM</span> pg_attribute </span>
+<span id="cb4-3"><a href="#cb4-3"></a><span class="kw">WHERE</span> attrelid <span class="op">=</span> <span class="st">&#39;pg_attribute&#39;</span>:<span class="ch">:regclass</span> </span>
+<span id="cb4-4"><a href="#cb4-4"></a>  <span class="kw">AND</span> attnum <span class="op">&gt;</span> <span class="dv">0</span> </span>
+<span id="cb4-5"><a href="#cb4-5"></a>  <span class="kw">AND</span> <span class="kw">NOT</span> attisdropped <span class="kw">ORDER</span> <span class="kw">BY</span> attnum;</span></code></pre></div>
+<p>In the result of that query, we can see that attrelid should be an <code>oid</code>:</p>
+<pre><code>attnum     |   attname     | Type
+-----------+---------------+-----------
+         1 | attrelid      | oid
+         2 | attname       | name
+         ...
+        20 | attoptions    | text[]
+        21 | attfdwoptions | text[]</code></pre>
+<p>without the “regclass” cast, querying by name would mean joining with the <code>pg_class</code> and filtering by name. There are other types that will get you an oid from a string description for other objects (<code>regprocedure</code> for procedures, <code>regtype</code> for types, …).</p>
+<h2 id="system-catalog-information-functions">System Catalog Information Functions</h2>
+<p>Another interesting utility for the <code>pg_catalog</code> approach is the ability to translate definitions into SQL DDL. We saw one of them (<code>format_type</code>) in the previous example, but there are many of them (constraints, function source code …).</p>
+<p>Just refer to the <a href="https://www.postgresql.org/docs/13/functions-info.html#FUNCTIONS-INFO-CATALOG-TABLE">section in the manual</a> for more.</p>
+<h2 id="inspecting-arbitrary-queries">Inspecting arbitrary queries</h2>
+<p>As a sidenote, it might be useful to know that we can inspect the data types of any provided query by pretending to turn it into a temporary table. This might be useful for user-provided queries in external tools (injection caveats apply)…</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1"></a><span class="kw">CREATE</span> TEMP <span class="kw">TABLE</span> tmp <span class="kw">AS</span> <span class="kw">SELECT</span> <span class="dv">1</span>:<span class="ch">:numeric</span>, now() <span class="kw">LIMIT</span> <span class="dv">0</span>;</span></code></pre></div>
+<h2 id="wrapping-up">Wrapping up</h2>
+<p>As usual, <strong>good SW practices apply to DB code, too</strong>, and it is easy to isolate any incompatible code just by defining a clear interface in your library: instead of querying for the catalog everywhere, define just a set of views or functions that expose the introspection information to the rest of your code and work as an API. This way, any future change in system catalogs will not propagate further than those specific views. For example, if your application needs to know about tables and attribute data types, instead of querying the catalog from many places, define a view that works as in interface between the system catalogs and your code. As an example:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">VIEW</span> table_columns <span class="kw">AS</span></span>
+<span id="cb7-2"><a href="#cb7-2"></a><span class="kw">WITH</span> table_oids <span class="kw">AS</span> (</span>
+<span id="cb7-3"><a href="#cb7-3"></a>      <span class="kw">SELECT</span> c.relname, c.<span class="kw">oid</span></span>
+<span id="cb7-4"><a href="#cb7-4"></a>      <span class="kw">FROM</span> pg_catalog.pg_class c</span>
+<span id="cb7-5"><a href="#cb7-5"></a>        <span class="kw">LEFT</span> <span class="kw">JOIN</span> pg_catalog.pg_namespace n <span class="kw">ON</span> n.<span class="kw">oid</span> <span class="op">=</span> c.relnamespace</span>
+<span id="cb7-6"><a href="#cb7-6"></a>      <span class="kw">WHERE</span> </span>
+<span id="cb7-7"><a href="#cb7-7"></a>        pg_catalog.pg_table_is_visible(c.<span class="kw">oid</span>) <span class="kw">AND</span> relkind <span class="op">=</span> <span class="st">&#39;r&#39;</span>),</span>
+<span id="cb7-8"><a href="#cb7-8"></a>    column_types <span class="kw">AS</span> (</span>
+<span id="cb7-9"><a href="#cb7-9"></a>      <span class="kw">SELECT</span></span>
+<span id="cb7-10"><a href="#cb7-10"></a>        toids.relname <span class="kw">AS</span> <span class="ot">&quot;tablename&quot;</span>, </span>
+<span id="cb7-11"><a href="#cb7-11"></a>        a.attname <span class="kw">as</span> <span class="ot">&quot;column&quot;</span>,</span>
+<span id="cb7-12"><a href="#cb7-12"></a>        pg_catalog.format_type(a.atttypid, a.atttypmod) <span class="kw">as</span> <span class="ot">&quot;datatype&quot;</span></span>
+<span id="cb7-13"><a href="#cb7-13"></a>      <span class="kw">FROM</span></span>
+<span id="cb7-14"><a href="#cb7-14"></a>        pg_catalog.pg_attribute a, table_oids toids</span>
+<span id="cb7-15"><a href="#cb7-15"></a>      <span class="kw">WHERE</span></span>
+<span id="cb7-16"><a href="#cb7-16"></a>        a.attnum <span class="op">&gt;</span> <span class="dv">0</span></span>
+<span id="cb7-17"><a href="#cb7-17"></a>        <span class="kw">AND</span> <span class="kw">NOT</span> a.attisdropped</span>
+<span id="cb7-18"><a href="#cb7-18"></a>        <span class="kw">AND</span> a.attrelid <span class="op">=</span> toids.<span class="kw">oid</span>)</span>
+<span id="cb7-19"><a href="#cb7-19"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> column_types;</span></code></pre></div>
+<p>I will be assembling some such utility views I find useful in the future in <a href="https://gist.github.com/jarnaldich/d5952a134d89dfac48d034ed141e86c5">this gist</a>.</p>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/postgres.html">postgres</a>, <a href="/tags/introspection.html">introspection</a>, <a href="/tags/database.html">database</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2021/08/30/postgres-introspection.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+]]></description>
+    <pubDate>Mon, 30 Aug 2021 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2021/08/30/postgres-introspection.html</guid>
+    <dc:creator>Joan Arnaldich</dc:creator>
+</item>
+<item>
     <title>Optimizing Geospatial Workloads</title>
     <link>http://jarnaldich.me/blog/2020/02/29/optimizing-geospatial-workloads.html</link>
     <description><![CDATA[<h1>Optimizing Geospatial Workloads</h1>
@@ -1205,92 +1352,6 @@ IN: scratchpad </code></pre>
 ]]></description>
     <pubDate>Wed, 13 Jul 2011 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2011/07/13/cygrunsrv.html</guid>
-    <dc:creator>Joan Arnaldich</dc:creator>
-</item>
-<item>
-    <title>Blogging with Jekyll</title>
-    <link>http://jarnaldich.me/blog/2011/07/01/first-post.html</link>
-    <description><![CDATA[<h1>Blogging with Jekyll</h1>
-
-<small>Posted on July  1, 2011 <a href="/blog/2011/07/01/first-post.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
-
-<p>… or, “from static to dynamic and back again”.</p>
-<p>I’ve finally decided to set-up a new technical blog. I think one of the main reasons it took me so long to start was that I couldn’t find an engine that matched my taste. Ok… as a coder, my taste is not exactly that of a final user.</p>
-<!-- more -->
-<ul>
-<li>I didn’t want to pay. I woult have felt a bit dumb knowing I could be using something like <a href="http://www.wordpress.com">WordPress</a> or <a href="http://www.blogger.com">Blogger</a> for free even if they’re not exactly what I’m looking for.</li>
-<li>I don’t think storing pages in a relational DB is the smartest thing to do. Relational DBs are for structured data, not documents.</li>
-<li>I want to be able to use the tools I learned to love as a coder in my posts. After all, It’s all about text, right? I want versioning, regexp searches, and all that good old unix tools for text processing.</li>
-<li>I’d rather die than use a web-based editor.</li>
-<li>I want to be able to produce high quality, standards compliant and easily modifyable html… but authoring in a more human-friendly markup, of course…</li>
-<li>I don’t want to be stuck to a system once I’ve started. What I care most is content. I want to be able to migrate my posts whenever I want.</li>
-<li>The system should be elegant, not a bunch of scripts tied together.</li>
-</ul>
-<p>After reading <a href="http://tom.preston-werner.com/2008/11/17/blogging-like-a-hacker.html">this post</a>, it became clear that what I wanted was a <em>static</em> site generator.</p>
-<p>Static? But that’s soooo 1990s… well yes… and no. I’ve you’ve ever tried to roll your own blog engine (a common web framework learning exercice), and got to the point of optimization, you may have come to realize that you can cache most, if not all, your content… mmmmm… This is certainly oversimplifying, but you get the point:</p>
-<p>DYNAMIC + A WHOLE LOT OF CACHING = STATIC</p>
-<p>The other, probably most relevant, difference from the 90s is the mashups culture. Your web app can rely on third party services for its dynamic parts. (IMHO, Even if you are able to serve dynamic content, it’s still interesting to use some of those services).</p>
-<p>Now that you know the <em>whys</em>, let’s talk about the <em>hows</em>.</p>
-<h2 id="jekyll">Jekyll</h2>
-<p>There are several static page generators out there (just Google for them). I feel confident with Ruby, but the key point here was <a href="http://pages.github.com/">Github Pages</a> having automatic <a href="http://jekyllrb.com/">Jekyll</a> processing (no suprise: jekyll’s author is one of the Github founders).</p>
-<p>I must admit I am curious about <a href="http://jaspervdj.be/hakyll/">Hakyll</a> too…</p>
-<p>With jekyll, you get:</p>
-<ul>
-<li>A full templating system based on markup authoring run through <a href="http://www.liquidmarkup.org/">liquid</a>-powered templates.</li>
-<li>Syntax highlighting (through) pygments. Just install it and run with the <code>--pygments</code> option.</li>
-<li>Tagging (not directly, but easy to add).</li>
-<li>A content-based related posts feature.</li>
-</ul>
-<p>Plus, of course, the possibility to store your blog at GitHub.</p>
-<h2 id="comments-system">Comments system</h2>
-<p>There are some good reasons for using a third party comment system instead of your own (security, merging different sources, statistics…), even if you can serve dynamic content. For this blog I chose <a href="http://disqus.com/">disqus</a>, but there are others…</p>
-<h2 id="github">Github</h2>
-<p>Both the content and the templates for this blog are hosted at a Github free account, which will even let you redirect your domain. You can check the source code, fork the repo or whatever <a href="https://github.com/jarnaldich/jarnaldich.github.com">here</a>.</p>
-<h2 id="updates-as-of-feb-2013">Updates as of Feb 2013</h2>
-<p>Some other tools have sprung around github pages / Jekyll. If I started blogging now I’d probably check them out:</p>
-<ul>
-<li><a href="http://octopress.org">Octopress</a> Is built on top of Jekyll to help hackers with the boring part of setting up a bloc (css, html templates, etc…).</li>
-<li><a href="http://jekyllbootstrap.org">Jekyll bootstrap</a> Helps setting up a github pages account. There’s a new project by the same author that aims to be language agnostic called <a href="http://ruhoh.com">ruhoh</a>.</li>
-</ul>
-
-<div class="panel panel-default">
-    <div class="panel-body">
-        <div class="pull-left">
-            Tags: <a href="/tags/jekyll.html">jekyll</a>, <a href="/tags/blogging.html">blogging</a>
-        </div>
-        <div class="social pull-right">
-            <span class="twitter">
-                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2011/07/01/first-post.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
-            </span>
-
-             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
-             <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
-  size="medium"></g:plusone>
-             </span>
-            
-        </div>
-    </div>
-</div>
-
-<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
-
-<div id="disqus_thread"></div>  
-<script type"text/javascript">
-      var disqus_shortname = 'jarnaldich';
-      (function() {
-          var dsq = document.createElement('script');
-          dsq.type = 'text/javascript';
-          dsq.async = true;
-          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-      })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-    
-]]></description>
-    <pubDate>Fri, 01 Jul 2011 00:00:00 UT</pubDate>
-    <guid>http://jarnaldich.me/blog/2011/07/01/first-post.html</guid>
     <dc:creator>Joan Arnaldich</dc:creator>
 </item>
 

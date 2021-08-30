@@ -2,7 +2,7 @@ stack runghc  --package directory-tree .\deploy.hs
 #copy -Force -Recurse .\_site\blog\*\*\*\*.* .\blog\ 
 git add .\blog
 
-("css images tags" -split " ") | % {
+("css images tags apps" -split " ") | % {
     copy -Force -Recurse .\_site\$_\*.* .\$_\ 
     git add $_
 }
