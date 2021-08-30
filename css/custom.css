@@ -114,3 +114,8 @@ figure {
   margin-right: auto;
   width: 60%;
 }
+
+.wrap {
+  float: left;
+  width: 300px;
+}

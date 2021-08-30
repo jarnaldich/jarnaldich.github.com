@@ -22,6 +22,10 @@ main = hakyll $ do
         route   idRoute
         compile compressCssCompiler
 
+    match "apps/**" $ do
+        route   idRoute
+        compile compressCssCompiler
+
     match "favicon.ico" $ do
         route idRoute
         compile copyFileCompiler

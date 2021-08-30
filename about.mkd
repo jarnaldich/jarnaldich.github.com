@@ -5,12 +5,13 @@ title: about
 About
 -----
 
-My name is Joan Arnaldich. I am a software developer and team manager
-presently working in Barcelona, Spain. By the way, Joan is a male
-first name in my [mother tongue](http://en.wikipedia.org/wiki/Catalan_language).
+My name is Joan Arnaldich (he/him). I am a software developer and team manager
+presently working in Barcelona, Spain. 
 
-My main interest areas in computing are non-imperative programming
-paradigms, distributed & parallel computing, image processing and
-geographic information systems. I also have a soft spot for some
-topics on applied maths (operations research, optimization,
-statistics, machine learning).
+My main interest areas in computing are functional programming, data science,
+(especially involving geographic information systems), and image processing.  I
+also have a soft spot for some topics on applied maths (operations research,
+optimization, statistics, machine learning).
+
+You can see my resume at [LinkedIn](https://www.linkedin.com/in/joan-arnaldich-bernal-74893869/)
+
