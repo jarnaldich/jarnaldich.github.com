@@ -66,15 +66,14 @@ main = hakyll $ do
             >>= loadAndApplyTemplate "templates/post.html" (taggedPostCtx tags)
             >>= saveSnapshot "content"
             >>= loadAndApplyTemplate "templates/default.html" postCtx
---            >>= relativizeUrls
 
-    match "drafts/*" $ do
-        route $ (customRoute draftRoute) `composeRoutes` (setExtension "html")
-        compile $ pandocCompilerWithTransformM pandocMathReaderOptions pandocMathWriterOptions transformer
-            >>= loadAndApplyTemplate "templates/post.html" (taggedPostCtx tags)
-            >>= saveSnapshot "content"
-            >>= loadAndApplyTemplate "templates/default.html" postCtx
---            >>= relativizeUrls
+-- Better not to process drafts to avoid accidental publishing
+--    match "drafts/*" $ do
+--        route $ (customRoute draftRoute) `composeRoutes` (setExtension "html")
+--        compile $ pandocCompilerWithTransformM pandocMathReaderOptions pandocMathWriterOptions transformer
+--            >>= loadAndApplyTemplate "templates/post.html" (taggedPostCtx tags)
+--            >>= saveSnapshot "content"
+--            >>= loadAndApplyTemplate "templates/default.html" postCtx
 
 
     create ["posts.html"] $ do
