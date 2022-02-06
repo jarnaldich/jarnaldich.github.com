@@ -54,7 +54,7 @@ and traceability for your data workflows.
 
 In this particular case we will assume our input is a table with `LineString`
 geometry features, each one with its unique identifier. Of course, geometries
-are properly indexed and tested for validity before any calculation. It is also often  
+are properly indexed and tested for validity before any calculation. It is also often
 useful during development to limit the calculation to a subset of the data
 through an area of interest in order to shorten the iteration process for testing
 results and parameters.
@@ -65,9 +65,9 @@ The sketch of the solution is:
    `ST_SimplifyPreserveTopology` will suffice.
 2. Explode the points, keeping track of the original geometries, this can be easily
    done with `generate_series` and `ST_DumpPoints`.
-3. We need 3 points to calculate isLeft: 2 to define the segment and the point
-   to test for. So, for each point along the `LineString`, get the X,Y
-   coordinates of the point itself, and the 2 previous points. We will be
+3. We need 3 points to calculate `isLeft`: 2 to define the segment and the point
+   to test for. So, for each point along the `LineString`, we get the X,Y
+   coordinates of the point itself and the 2 previous points. We will be
    checking for the current point position in relation to the segment defined by
    the two previous points. This also means that the turning point, when
    detected, will be last point of the segment, that is: the previous point.
