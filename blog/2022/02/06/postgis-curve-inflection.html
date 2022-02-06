@@ -3,23 +3,25 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-        <title>Joan Arnaldich - Home</title>
+        <title>Joan Arnaldich - Finding Curve Inflection Points in PostGIS</title>
 
         <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
 
-        <link href="http://fonts.googleapis.com/css?family=Abel" rel="stylesheet" type="text/css">
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
 
 	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
 
-	<link rel="stylesheet" type="text/css" href="./css/syntax.css" />
-        <link rel="stylesheet" type="text/css" href="./css/custom.css" />
-        <link rel="stylesheet" type="text/css" href="./css/prism.css" />
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
     <body>
-<script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-	<script src="./js/prism.js"></script>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
         <div class="container">
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -29,14 +31,14 @@
 
                         <div style="margin-top:20px;">
                             <div class="row">
-                                <div class="col-md-2"><a href="./"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
 
-                                <div class="col-md-2"><a href="./posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
-                                <div class="col-md-2"><a href="./tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
-                                <div class="col-md-2"><a href="./about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
                                 <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
                                 <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
-                                <div class="col-xs-1"><a href="./rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
                             </div>
                         </div>
                     </div>
@@ -46,13 +48,13 @@
                 <div class="col-md-10 col-md-offset-1">
                     <h1>Finding Curve Inflection Points in PostGIS</h1>
 
-<small>Posted on February  6, 2022 <a href="./blog/2022/28/06/postgis-curve-inflection.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+<small>Posted on February  6, 2022 <a href="/blog/2022/02/06/postgis-curve-inflection.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <p>In this blog post I will present a way to find inflection points in a curve. An easy way to understand this: imagine the curve is the road we are driving along, we want to find the points in which we stop turning right and start turning left or vice versa, as shown below:</p>
 <figure>
-<img src="./images/curve_inflection.png" title="Sample of curve inflection points" class="center" width="400" alt /><figcaption> </figcaption>
+<img src="/images/curve_inflection.png" title="Sample of curve inflection points" class="center" width="400" alt="" /><figcaption> </figcaption>
 </figure>
-<p>We will show a sketch of the solution and a practial implementation in <a href="https://postgis.net">PostGIS</a>. I thik this is a good showcase simple example of useful tecniques to implement <a href="https://www.nationalgeographic.org/encyclopedia/geographic-information-system-gis/">GIS</a> algorithms inside the database.</p>
+<p>We will show a sketch of the solution and a practial implementation with <a href="https://postgis.net">PostGIS</a>.</p>
 <h2 id="a-sketch-of-the-solution">A sketch of the solution</h2>
 <p>This problem can be solved with pretty standard 2d computational geometry resources. In particular, the use of the <a href="https://mathworld.wolfram.com/CrossProduct.html">cross product</a> as a way to detect if a point lies left or right of a given straight line will be useful here. The following pseudo-code is based on the determinant formula:</p>
 <pre><code>function isLeft(Point a, Point b, Point c){
@@ -131,22 +133,23 @@
 <span id="cb2-56"><a href="#cb2-56"></a><span class="kw">ORDER</span> <span class="kw">BY</span> contour_id, npoint</span></code></pre></div>
 <p>Here’s what the results look like for a sample area:</p>
 <figure>
-<img src="./images/curve_inflection_2.png" title="Sample of curve inflection points results" class="center" alt /><figcaption> </figcaption>
+<img src="/images/curve_inflection_2.png" title="Sample of curve inflection points results" class="center" alt="" /><figcaption> </figcaption>
 </figure>
 
 <div class="panel panel-default">
     <div class="panel-body">
         <div class="pull-left">
-            Tags: <a href="./tags/postgres.html">postgres</a>, <a href="./tags/postgis.html">postgis</a>, <a href="./tags/curve.html">curve</a>, <a href="./tags/inflection.html">inflection</a>, <a href="./tags/GIS.html">GIS</a>
+            Tags: <a href="/tags/postgres.html">postgres</a>, <a href="/tags/postgis.html">postgis</a>, <a href="/tags/curve.html">curve</a>, <a href="/tags/inflection.html">inflection</a>, <a href="/tags/GIS.html">GIS</a>
         </div>
         <div class="social pull-right">
             <span class="twitter">
-                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2022/28/06/postgis-curve-inflection.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2022/02/06/postgis-curve-inflection.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
             </span>
 
              <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
              <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/" size="medium"></g:plusone>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
              </span>
             
         </div>
@@ -156,7 +159,7 @@
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
 <div id="disqus_thread"></div>  
-<script type"text javascript">
+<script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
           var dsq = document.createElement('script');
@@ -168,7 +171,6 @@
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
     
-
 
                 </div>
             </div>
