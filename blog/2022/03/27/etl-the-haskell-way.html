@@ -3,23 +3,25 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-        <title>Joan Arnaldich - Home</title>
+        <title>Joan Arnaldich - ETL The Haskell Way</title>
 
         <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
 
-        <link href="http://fonts.googleapis.com/css?family=Abel" rel="stylesheet" type="text/css">
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
 
 	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
 
-	<link rel="stylesheet" type="text/css" href="./css/syntax.css" />
-        <link rel="stylesheet" type="text/css" href="./css/custom.css" />
-        <link rel="stylesheet" type="text/css" href="./css/prism.css" />
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
     <body>
-<script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-	<script src="./js/prism.js"></script>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
         <div class="container">
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -29,14 +31,14 @@
 
                         <div style="margin-top:20px;">
                             <div class="row">
-                                <div class="col-md-2"><a href="./"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
 
-                                <div class="col-md-2"><a href="./posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
-                                <div class="col-md-2"><a href="./tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
-                                <div class="col-md-2"><a href="./about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
                                 <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
                                 <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
-                                <div class="col-xs-1"><a href="./rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
                             </div>
                         </div>
                     </div>
@@ -46,16 +48,16 @@
                 <div class="col-md-10 col-md-offset-1">
                     <h1>ETL The Haskell Way</h1>
 
-<small>Posted on March 27, 2022 <a href="./blog/2022/03/27/etl-the-haskell-way.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+<small>Posted on March 27, 2022 <a href="/blog/2022/03/27/etl-the-haskell-way.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <p>Extract Transform Load (ETL) is a broad term for processes that read a subset of data in one format, perform a more or less involved transformation and then store it in a (maybe) different format. Those processes can of course be linked together to form larger data pipelines. As in many such general terms, this can mean very different things in terms of software architecture and implementations. For example, depending on the scale of the data the solution may range from unix shell pipeline to a full-blown <a href="https://nifi.apache.org/">Apache nifi</a> solution.</p>
 <p>One common theme is data impedance mismatch between formats. Take for example JSON and XML. They are surely different, but for any particular application you can find a way to move data from one to the other. They even have their own <a href="https://chrispenner.ca/posts/traversal-systems">traversal systems</a> (<a href="https://stedolan.github.io/jq/">jq</a>’s syntax and <a href="https://developer.mozilla.org/en-US/docs/Web/XPath">XPath</a>).</p>
 <p>The most widely used solution for small to medium data is to write small ad-hoc scripts. One can somewhat abstract over these formats by <a href="https://blog.lazy-evaluation.net/posts/linux/jq-xq-yq.html">abusing jq</a>.</p>
 <p>In this blog post we will explore more elegant way to perform such transformations using Haskell. The purpose of this post is just to pique your curiosity with what’s possible in this area with Haskell. It is definitely <em>not</em> intended as a tutorial on optics, which are not for Haskell beginners, anyways…</p>
 <h2 id="the-problem">The Problem</h2>
-<p>We will be enriching a <a href="https://datatracker.ietf.org/doc/html/rfc7946">geojson</a> dataset containing <a href="static/countries.geo.json">countries</a> at a world scale taken from natural earth and enriching it with <a href="static/population.xml">population data in xml</a> as provided by the world bank API so that it can be used, for example, to produce a <a href>choropleth</a> <del>map</del><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> visualization.</p>
+<p>We will be enriching a <a href="https://datatracker.ietf.org/doc/html/rfc7946">geojson</a> dataset containing <a href="static/countries.geo.json">countries</a> at a world scale taken from natural earth and enriching it with <a href="static/population.xml">population data in xml</a> as provided by the world bank API so that it can be used, for example, to produce a <a href="">choropleth</a> <del>map</del><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> visualization.</p>
 <figure>
-<img src="./images/worldpop.png" title="this is not a map" class="center" alt /><figcaption> </figcaption>
+<img src="/images/worldpop.png" title="this is not a map" class="center" alt="" /><figcaption> </figcaption>
 </figure>
 <p>Haskell is a curiously effective fit for this kind of problems due to the unlikely combination of three seemingly unrelated traits: its parsing libraries (driven by a community interested in programming languages theory), <em>optics</em> (also driven by PLT and a gruesome syntax for record accessors, at least up to the recent addition of <code>RecordDotSyntax</code>), and the convience for writing scripts with the <code>stack</code> tool (driven by the olden unreliability of <code>cabal</code> builds).</p>
 <p>It is the fact that Haskell is so <em>abstract</em>, that makes it easy to combine libraries never intended to work together in the first place. Haskell libraries tend to define its interfaces in terms of very general terms (eg. structures that can be mapped into, structures that can be “summarized”, etc..).</p>
@@ -64,7 +66,7 @@
 <p>Haskell comes from a long tradition of programming language theory applications, and it shines for building parsers, so there is no shortage of libraries for reading the most common formats. But, more important than the availability of parsing libraries itself, it’s the <a href="https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/">parse, don’t validate</a> approach in this libraries that works here: most of them have the ability to decode (deserialize,parse) its input into a well typed structured value in memory (think Abstract Syntax Tree).</p>
 <p>So a typical workflow would be to read the data from disk into a more or less abstract representation in memory involving nested data structures, then transform it into another representation in memory (maybe generated from a template) through the use of optics and then serialize it back to disk:</p>
 <figure>
-<img src="./images/haskell_lens_workflow.png" title="Haskell lens workflow" class="center" alt /><figcaption> </figcaption>
+<img src="/images/haskell_lens_workflow.png" title="Haskell lens workflow" class="center" alt="" /><figcaption> </figcaption>
 </figure>
 <h3 id="optics">Optics</h3>
 <p>Optics (lenses, prisms, traversals) are way to abstract getters and setters in a composable way. Their surface syntax reads like “pinpointing” or “bookmarking” into a deeply nested data structure (think <code>XPath</code>), which make it nice for visually keeping track of what is being read or altered.</p>
@@ -135,7 +137,7 @@
 <div class="panel panel-default">
     <div class="panel-body">
         <div class="pull-left">
-            Tags: <a href="./tags/haskell.html">haskell</a>, <a href="./tags/data.html">data</a>, <a href="./tags/xml.html">xml</a>, <a href="./tags/json.html">json</a>, <a href="./tags/geojson.html">geojson</a>
+            Tags: <a href="/tags/haskell.html">haskell</a>, <a href="/tags/data.html">data</a>, <a href="/tags/xml.html">xml</a>, <a href="/tags/json.html">json</a>, <a href="/tags/geojson.html">geojson</a>
         </div>
         <div class="social pull-right">
             <span class="twitter">
@@ -144,7 +146,8 @@
 
              <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
              <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/" size="medium"></g:plusone>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
              </span>
             
         </div>
@@ -154,7 +157,7 @@
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
 <div id="disqus_thread"></div>  
-<script type"text javascript">
+<script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
           var dsq = document.createElement('script');
@@ -166,7 +169,6 @@
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
     
-
 
                 </div>
             </div>

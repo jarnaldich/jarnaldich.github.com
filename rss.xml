@@ -7,108 +7,106 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Sun, 06 Feb 2022 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Sun, 27 Mar 2022 00:00:00 UT</lastBuildDate>
         <item>
-    <title>Finding Curve Inflection Points in PostGIS</title>
-    <link>http://jarnaldich.me/blog/2022/28/06/postgis-curve-inflection.html</link>
-    <description><![CDATA[<h1>Finding Curve Inflection Points in PostGIS</h1>
+    <title>ETL The Haskell Way</title>
+    <link>http://jarnaldich.me/blog/2022/03/27/etl-the-haskell-way.html</link>
+    <description><![CDATA[<h1>ETL The Haskell Way</h1>
 
-<small>Posted on February  6, 2022 <a href="/blog/2022/28/06/postgis-curve-inflection.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+<small>Posted on March 27, 2022 <a href="/blog/2022/03/27/etl-the-haskell-way.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
-<p>In this blog post I will present a way to find inflection points in a curve. An easy way to understand this: imagine the curve is the road we are driving along, we want to find the points in which we stop turning right and start turning left or vice versa, as shown below:</p>
+<p>Extract Transform Load (ETL) is a broad term for processes that read a subset of data in one format, perform a more or less involved transformation and then store it in a (maybe) different format. Those processes can of course be linked together to form larger data pipelines. As in many such general terms, this can mean very different things in terms of software architecture and implementations. For example, depending on the scale of the data the solution may range from unix shell pipeline to a full-blown <a href="https://nifi.apache.org/">Apache nifi</a> solution.</p>
+<p>One common theme is data impedance mismatch between formats. Take for example JSON and XML. They are surely different, but for any particular application you can find a way to move data from one to the other. They even have their own <a href="https://chrispenner.ca/posts/traversal-systems">traversal systems</a> (<a href="https://stedolan.github.io/jq/">jq</a>’s syntax and <a href="https://developer.mozilla.org/en-US/docs/Web/XPath">XPath</a>).</p>
+<p>The most widely used solution for small to medium data is to write small ad-hoc scripts. One can somewhat abstract over these formats by <a href="https://blog.lazy-evaluation.net/posts/linux/jq-xq-yq.html">abusing jq</a>.</p>
+<p>In this blog post we will explore more elegant way to perform such transformations using Haskell. The purpose of this post is just to pique your curiosity with what’s possible in this area with Haskell. It is definitely <em>not</em> intended as a tutorial on optics, which are not for Haskell beginners, anyways…</p>
+<h2 id="the-problem">The Problem</h2>
+<p>We will be enriching a <a href="https://datatracker.ietf.org/doc/html/rfc7946">geojson</a> dataset containing <a href="static/countries.geo.json">countries</a> at a world scale taken from natural earth and enriching it with <a href="static/population.xml">population data in xml</a> as provided by the world bank API so that it can be used, for example, to produce a <a href="">choropleth</a> <del>map</del><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> visualization.</p>
 <figure>
-<img src="/images/curve_inflection.png" title="Sample of curve inflection points" class="center" width="400" alt="" /><figcaption> </figcaption>
+<img src="/images/worldpop.png" title="this is not a map" class="center" alt="" /><figcaption> </figcaption>
 </figure>
-<p>We will show a sketch of the solution and a practial implementation in <a href="https://postgis.net">PostGIS</a>. I thik this is a good showcase simple example of useful tecniques to implement <a href="https://www.nationalgeographic.org/encyclopedia/geographic-information-system-gis/">GIS</a> algorithms inside the database.</p>
-<h2 id="a-sketch-of-the-solution">A sketch of the solution</h2>
-<p>This problem can be solved with pretty standard 2d computational geometry resources. In particular, the use of the <a href="https://mathworld.wolfram.com/CrossProduct.html">cross product</a> as a way to detect if a point lies left or right of a given straight line will be useful here. The following pseudo-code is based on the determinant formula:</p>
-<pre><code>function isLeft(Point a, Point b, Point c){
-     return ((b.X - a.X)*(c.Y - a.Y) - (b.Y - a.Y)*(c.X - a.X)) &gt; 0;
-}</code></pre>
-<p>In general, I am against implementing your own computational geometry code: the direct translation of mathematical formulas are often plagued with rounding-off errors, corner cases and blatant inefficiencies. You would be better off using one of the excellent computational geometry libraries such as: <a href="https://libgeos.org">GEOS</a>, which started as a port of the <a href="https://github.com/locationtech/jts">JTS</a>, or <a href="https://www.cgal.org/">CGAL</a>. Chances are that you are using them anyway, since they lie at the bottom of many <a href="https://www.nationalgeographic.org/encyclopedia/geographic-information-system-gis/">GIS</a> software stacks. This holds true for any non-trivial mathematics (linear algebra, optimization…). Remember: <strong><code>floats</code> are NOT real numbers</strong></p>
-<p>In this case, where I cared a lot more about practicality than sheer efficiency, the use of SQLs <code>numeric</code> types, which offer arbitrary precision arithmetics at the expense of speed, prevents some of the rounding-off errors we would get with <code>double precision</code>, sparing us to implement <a href="https://www.cs.cmu.edu/~quake/robust.html">fast robust predicates</a> ourselves.</p>
-<h2 id="postgis-implementaton">PostGIS implementaton</h2>
-<p>I have long felt that Postgres/PostGIS is the nicest workbench for geospatial analysis (prove me wrong). In many use cases, being able to perform the analysis directly where your data is stored is unbeatable. Having to write a SQL script may be a throwback for some users, but works charms in terms of reproducibility and traceability for your data workflows.</p>
-<p>In this particular case we will assume our input is a table with <code>LineString</code> geometry features, each one with its unique identifier. Of course, geometries are properly indexed and tested for validity before any calculation. It is also often useful during development to limit the calculation to a subset of the data through an area of interest in order to shorten the iteration process for testing results and parameters.</p>
-<p>The sketch of the solution is:</p>
+<p>Haskell is a curiously effective fit for this kind of problems due to the unlikely combination of three seemingly unrelated traits: its parsing libraries (driven by a community interested in programming languages theory), <em>optics</em> (also driven by PLT and a gruesome syntax for record accessors, at least up to the recent addition of <code>RecordDotSyntax</code>), and the convience for writing scripts with the <code>stack</code> tool (driven by the olden unreliability of <code>cabal</code> builds).</p>
+<p>It is the fact that Haskell is so <em>abstract</em>, that makes it easy to combine libraries never intended to work together in the first place. Haskell libraries tend to define its interfaces in terms of very general terms (eg. structures that can be mapped into, structures that can be “summarized”, etc..).</p>
+<p>Let’s break down how these work together.</p>
+<h3 id="parsing-libraries">Parsing Libraries</h3>
+<p>Haskell comes from a long tradition of programming language theory applications, and it shines for building parsers, so there is no shortage of libraries for reading the most common formats. But, more important than the availability of parsing libraries itself, it’s the <a href="https://lexi-lambda.github.io/blog/2019/11/05/parse-don-t-validate/">parse, don’t validate</a> approach in this libraries that works here: most of them have the ability to decode (deserialize,parse) its input into a well typed structured value in memory (think Abstract Syntax Tree).</p>
+<p>So a typical workflow would be to read the data from disk into a more or less abstract representation in memory involving nested data structures, then transform it into another representation in memory (maybe generated from a template) through the use of optics and then serialize it back to disk:</p>
+<figure>
+<img src="/images/haskell_lens_workflow.png" title="Haskell lens workflow" class="center" alt="" /><figcaption> </figcaption>
+</figure>
+<h3 id="optics">Optics</h3>
+<p>Optics (lenses, prisms, traversals) are way to abstract getters and setters in a composable way. Their surface syntax reads like “pinpointing” or “bookmarking” into a deeply nested data structure (think <code>XPath</code>), which make it nice for visually keeping track of what is being read or altered.</p>
+<p>The learning curve is wild, and their error messages convoluted, but the fact that in Haskell we can abstract accessors away from any particular data structure, and that there are well-defined functions to combine them can reduce the size of your data transformation toolbox. And lighter toolboxes are easier to carry around with you.</p>
+<h3 id="scripting">Scripting</h3>
+<p>A lot of the data wrangling programs are one-shot scripts, where you care about the result more than about the software itself. Having to create a new app each time can be tiresome, so using scripting and knowing you can rely on a set of curated libraries to get the job done is really nice. Starting with a script that can be turned at any time into a full blown app that works on all the major platforms is a plus.</p>
+<h2 id="the-solution">The Solution</h2>
+<p>The steps follow the typical workflow quite closely, in our case:</p>
 <ol type="1">
-<li>Simplify the geometries to avoid noise (false positives). <code>ST_Simplify</code> or <code>ST_SimplifyPreserveTopology</code> will suffice.</li>
-<li>Explode the points, keeping track of the original geometries, this can be easily done with <code>generate_series</code> and <code>ST_DumpPoints</code>.</li>
-<li>We need 3 points to calculate <code>isLeft</code>: 2 to define the segment and the point to test for. So, for each point along the <code>LineString</code>, we get the X,Y coordinates of the point itself and the 2 previous points. We will be checking for the current point position in relation to the segment defined by the two previous points. This also means that the turning point, when detected, will be last point of the segment, that is: the previous point. I found this calculation to be surprisingly easy through Posgres window functions.</li>
-<li>Use the above points to calculate a measure for isLeft.</li>
-<li>Select the points where this measure changes.</li>
+<li>Parse the <code>.xml</code> file into a data structure (a document) in memory.</li>
+<li>Build a map from country codes to population.</li>
+<li>Read the geojson file with country info and get the array of features.</li>
+<li>For each feature, create a new key with the population.</li>
 </ol>
-<p>As usual, good code practices in general also apply to the database. In particular, <a href="https://www.postgresql.org/docs/13/queries-with.html">CTEs</a> can be used to clarify queries in the same way you would name variables or functions in whatever programming language: to enable reuse, but also to enhance readability by giving descriptive names. There is no excuse for <em>any</em> of the eye-burning SQL queries that are too often considered normal in the language.</p>
-<p>Look at the sketch solution and contrast with the following implementation to see what I mean:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">WITH</span> </span>
-<span id="cb2-2"><a href="#cb2-2"></a>  <span class="co">-- Optional: area of interest.</span></span>
-<span id="cb2-3"><a href="#cb2-3"></a>  aoi <span class="kw">AS</span> (</span>
-<span id="cb2-4"><a href="#cb2-4"></a>    <span class="kw">SELECT</span> ST_SetSRID(</span>
-<span id="cb2-5"><a href="#cb2-5"></a>          ST_MakeBox2D(</span>
-<span id="cb2-6"><a href="#cb2-6"></a>            ST_Point(<span class="dv">467399</span>,<span class="dv">4671999</span>),</span>
-<span id="cb2-7"><a href="#cb2-7"></a>            ST_Point(<span class="dv">470200</span>,<span class="dv">4674000</span>))</span>
-<span id="cb2-8"><a href="#cb2-8"></a>          ,<span class="dv">25831</span>) </span>
-<span id="cb2-9"><a href="#cb2-9"></a>        <span class="kw">AS</span> geom</span>
-<span id="cb2-10"><a href="#cb2-10"></a>  ),</span>
-<span id="cb2-11"><a href="#cb2-11"></a>  <span class="co">-- Simplify geometries to avoid excessive noise. Tolerance is empiric and depends on application</span></span>
-<span id="cb2-12"><a href="#cb2-12"></a>  simplified <span class="kw">AS</span> (</span>
-<span id="cb2-13"><a href="#cb2-13"></a>    <span class="kw">SELECT</span> <span class="kw">oid</span> <span class="kw">as</span> contour_id, ST_Simplify(input_contours.geom, <span class="fl">0.2</span>) <span class="kw">AS</span> geom </span>
-<span id="cb2-14"><a href="#cb2-14"></a>    <span class="kw">FROM</span> input_contours, aoi</span>
-<span id="cb2-15"><a href="#cb2-15"></a>    <span class="kw">WHERE</span> input_contours.geom &amp;&amp; aoi.geom</span>
-<span id="cb2-16"><a href="#cb2-16"></a>  ), </span>
-<span id="cb2-17"><a href="#cb2-17"></a>  <span class="co">-- Explode points generating index and keeping track of original curve</span></span>
-<span id="cb2-18"><a href="#cb2-18"></a>  points <span class="kw">AS</span> (</span>
-<span id="cb2-19"><a href="#cb2-19"></a>    <span class="kw">SELECT</span> contour_id,</span>
-<span id="cb2-20"><a href="#cb2-20"></a>        generate_series(<span class="dv">1</span>, st_numpoints(geom)) <span class="kw">AS</span> npoint,</span>
-<span id="cb2-21"><a href="#cb2-21"></a>        (ST_DumpPoints(geom)).geom <span class="kw">AS</span> geom</span>
-<span id="cb2-22"><a href="#cb2-22"></a>    <span class="kw">FROM</span> simplified</span>
-<span id="cb2-23"><a href="#cb2-23"></a>  ), </span>
-<span id="cb2-24"><a href="#cb2-24"></a>  <span class="co">-- Get the numeric values for X an Y of the current point </span></span>
-<span id="cb2-25"><a href="#cb2-25"></a>  coords <span class="kw">AS</span> (</span>
-<span id="cb2-26"><a href="#cb2-26"></a>    <span class="kw">SELECT</span> <span class="op">*</span>, st_x(geom):<span class="ch">:numeric</span> <span class="kw">AS</span> cx, st_y(geom):<span class="ch">:numeric</span> <span class="kw">AS</span> cy</span>
-<span id="cb2-27"><a href="#cb2-27"></a>    <span class="kw">FROM</span> points    </span>
-<span id="cb2-28"><a href="#cb2-28"></a>    <span class="kw">ORDER</span> <span class="kw">BY</span> contour_id, npoint</span>
-<span id="cb2-29"><a href="#cb2-29"></a>  ),</span>
-<span id="cb2-30"><a href="#cb2-30"></a>  <span class="co">-- Add the values of the 2 previous points inside the same linestring</span></span>
-<span id="cb2-31"><a href="#cb2-31"></a>  <span class="co">-- LAG and PARTITION BY do all the work here.</span></span>
-<span id="cb2-32"><a href="#cb2-32"></a>  segments <span class="kw">AS</span> (</span>
-<span id="cb2-33"><a href="#cb2-33"></a>    <span class="kw">SELECT</span> <span class="op">*</span>, </span>
-<span id="cb2-34"><a href="#cb2-34"></a>      <span class="fu">LAG</span>(geom, <span class="dv">1</span>)        <span class="kw">over</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> contour_id) <span class="kw">AS</span> prev_geom, </span>
-<span id="cb2-35"><a href="#cb2-35"></a>      <span class="fu">LAG</span>(cx:<span class="ch">:numeric</span>, <span class="dv">2</span>) <span class="kw">over</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> contour_id) <span class="kw">AS</span> ax, </span>
-<span id="cb2-36"><a href="#cb2-36"></a>      <span class="fu">LAG</span>(cy:<span class="ch">:numeric</span>, <span class="dv">2</span>) <span class="kw">over</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> contour_id) <span class="kw">AS</span> ay, </span>
-<span id="cb2-37"><a href="#cb2-37"></a>      <span class="fu">LAG</span>(cx:<span class="ch">:numeric</span>, <span class="dv">1</span>) <span class="kw">over</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> contour_id) <span class="kw">AS</span> bx, </span>
-<span id="cb2-38"><a href="#cb2-38"></a>      <span class="fu">LAG</span>(cy:<span class="ch">:numeric</span>, <span class="dv">1</span>) <span class="kw">over</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> contour_id) <span class="kw">AS</span> <span class="kw">by</span></span>
-<span id="cb2-39"><a href="#cb2-39"></a>    <span class="kw">FROM</span> coords</span>
-<span id="cb2-40"><a href="#cb2-40"></a>    <span class="kw">ORDER</span> <span class="kw">BY</span> contour_id, npoint</span>
-<span id="cb2-41"><a href="#cb2-41"></a>  ),</span>
-<span id="cb2-42"><a href="#cb2-42"></a>  det <span class="kw">AS</span> (</span>
-<span id="cb2-43"><a href="#cb2-43"></a>    <span class="kw">SELECT</span> <span class="op">*</span>, </span>
-<span id="cb2-44"><a href="#cb2-44"></a>      (((bx<span class="op">-</span>ax)<span class="op">*</span>(cy<span class="op">-</span>ay)) <span class="op">-</span> ((<span class="kw">by</span><span class="op">-</span>ay)<span class="op">*</span>(cx<span class="op">-</span>ax))) <span class="kw">AS</span> det <span class="co">-- cross product in 2d</span></span>
-<span id="cb2-45"><a href="#cb2-45"></a>    <span class="kw">FROM</span> segments</span>
-<span id="cb2-46"><a href="#cb2-46"></a>  ),</span>
-<span id="cb2-47"><a href="#cb2-47"></a>  <span class="co">-- Uses the SIGN multipliaction as a proxy for XOR (change in convexity) </span></span>
-<span id="cb2-48"><a href="#cb2-48"></a>  convexity <span class="kw">AS</span> (</span>
-<span id="cb2-49"><a href="#cb2-49"></a>    <span class="kw">SELECT</span> <span class="op">*</span>, </span>
-<span id="cb2-50"><a href="#cb2-50"></a>      <span class="fu">SIGN</span>(det) <span class="op">*</span> <span class="fu">SIGN</span>(<span class="fu">lag</span>(det, <span class="dv">1</span>) <span class="kw">OVER</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> contour_id)) <span class="kw">AS</span> <span class="kw">change</span></span>
-<span id="cb2-51"><a href="#cb2-51"></a>    <span class="kw">FROM</span> det</span>
-<span id="cb2-52"><a href="#cb2-52"></a>  )</span>
-<span id="cb2-53"><a href="#cb2-53"></a><span class="kw">SELECT</span> contour_id, npoint, prev_geom <span class="kw">AS</span> geom</span>
-<span id="cb2-54"><a href="#cb2-54"></a><span class="kw">FROM</span> convexity</span>
-<span id="cb2-55"><a href="#cb2-55"></a><span class="kw">WHERE</span> <span class="kw">change</span> <span class="op">=</span> <span class="op">-</span><span class="dv">1</span></span>
-<span id="cb2-56"><a href="#cb2-56"></a><span class="kw">ORDER</span> <span class="kw">BY</span> contour_id, npoint</span></code></pre></div>
-<p>Here’s what the results look like for a sample area:</p>
-<figure>
-<img src="/images/curve_inflection_2.png" title="Sample of curve inflection points results" class="center" alt="" /><figcaption> </figcaption>
-</figure>
+<p>This overall structure can be traced in our main function:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1"></a>main <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb1-2"><a href="#cb1-2"></a>  xml <span class="ot">&lt;-</span> XML.readFile XML.def <span class="st">&quot;population.xml&quot;</span> <span class="co">-- Parse the XML file into a memory document</span></span>
+<span id="cb1-3"><a href="#cb1-3"></a>  <span class="kw">let</span> pop2020Map <span class="ot">=</span> Map.fromList <span class="op">$</span> runReader records xml <span class="co">-- Build a map Country -&gt; Population</span></span>
+<span id="cb1-4"><a href="#cb1-4"></a>  jsonBytes <span class="ot">&lt;-</span> LB8.readFile <span class="st">&quot;countries.geo.json&quot;</span> <span class="co">-- Parse the countries geojson into memory</span></span>
+<span id="cb1-5"><a href="#cb1-5"></a>  <span class="kw">let</span> <span class="dt">Just</span> json <span class="ot">=</span> Json.decode<span class="ot"> jsonBytes ::</span> <span class="dt">Maybe</span> <span class="dt">Json.Value</span></span>
+<span id="cb1-6"><a href="#cb1-6"></a>  <span class="kw">let</span> featureList <span class="ot">=</span> runReader (features pop2020Map)<span class="ot"> json ::</span> [ <span class="dt">Json.Value</span> ] <span class="co">-- Get features with new population key</span></span>
+<span id="cb1-7"><a href="#cb1-7"></a>  <span class="kw">let</span> newJson <span class="ot">=</span> json <span class="op">&amp;</span> key <span class="st">&quot;features&quot;</span>  <span class="op">.~</span> (<span class="dt">Json.Array</span> <span class="op">$</span> V.fromList featureList) <span class="co">-- Update the original Json</span></span>
+<span id="cb1-8"><a href="#cb1-8"></a>  LB8.writeFile <span class="st">&quot;countriesWithPopulation.geo.json&quot;</span> <span class="op">$</span> Json.encode newJson <span class="co">-- Write back to disk</span></span></code></pre></div>
+<p>The form of the input data is not especially well suited for this app. The world population xml is basically a table in disguise (remember the data impedance problem?). It is basically a list of:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode xml"><code class="sourceCode xml"><span id="cb2-1"><a href="#cb2-1"></a>    <span class="kw">&lt;record&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2"></a>      <span class="kw">&lt;field</span><span class="ot"> name=</span><span class="st">&quot;Country or Area&quot;</span><span class="ot"> key=</span><span class="st">&quot;ABW&quot;</span><span class="kw">&gt;</span>Aruba<span class="kw">&lt;/field&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3"></a>      <span class="kw">&lt;field</span><span class="ot"> name=</span><span class="st">&quot;Item&quot;</span><span class="ot"> key=</span><span class="st">&quot;SP.POP.TOTL&quot;</span><span class="kw">&gt;</span>Population, total<span class="kw">&lt;/field&gt;</span></span>
+<span id="cb2-4"><a href="#cb2-4"></a>      <span class="kw">&lt;field</span><span class="ot"> name=</span><span class="st">&quot;Year&quot;</span><span class="kw">&gt;</span>1960<span class="kw">&lt;/field&gt;</span></span>
+<span id="cb2-5"><a href="#cb2-5"></a>      <span class="kw">&lt;field</span><span class="ot"> name=</span><span class="st">&quot;Value&quot;</span><span class="kw">&gt;</span>54208<span class="kw">&lt;/field&gt;</span></span>
+<span id="cb2-6"><a href="#cb2-6"></a>    <span class="kw">&lt;/record&gt;</span></span></code></pre></div>
+<p>That means the function that reads it has to associate information from two siblings in the XML tree, but that is easy using the <code>magnify</code> function inside a <code>Reader</code> monad:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1"></a><span class="ot">records ::</span> <span class="dt">Reader</span> <span class="dt">XML.Document</span> [(<span class="dt">T.Text</span>, <span class="dt">Scientific</span>)]</span>
+<span id="cb3-2"><a href="#cb3-2"></a>records <span class="ot">=</span></span>
+<span id="cb3-3"><a href="#cb3-3"></a>  <span class="kw">let</span></span>
+<span id="cb3-4"><a href="#cb3-4"></a>    <span class="co">-- Lens to access an attribute from record to field. Intended to be composed.</span></span>
+<span id="cb3-5"><a href="#cb3-5"></a>    field name <span class="ot">=</span> nodes <span class="op">.</span> folded <span class="op">.</span> _Element <span class="op">.</span> named <span class="st">&quot;field&quot;</span> <span class="op">.</span> attributeIs <span class="st">&quot;name&quot;</span> name</span>
+<span id="cb3-6"><a href="#cb3-6"></a>  <span class="kw">in</span> <span class="kw">do</span></span>
+<span id="cb3-7"><a href="#cb3-7"></a>    <span class="co">-- Zoom and iterate all records</span></span>
+<span id="cb3-8"><a href="#cb3-8"></a>    magnify (root <span class="op">.</span> named <span class="st">&quot;Root&quot;</span> <span class="op">./</span> named <span class="st">&quot;data&quot;</span> <span class="op">./</span> named <span class="st">&quot;record&quot;</span>) <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb3-9"><a href="#cb3-9"></a>      record <span class="ot">&lt;-</span> ask</span>
+<span id="cb3-10"><a href="#cb3-10"></a>      <span class="kw">let</span> name <span class="ot">=</span> record <span class="op">^?</span> (field <span class="st">&quot;Country or Area&quot;</span> <span class="op">.</span> attr <span class="st">&quot;key&quot;</span>)</span>
+<span id="cb3-11"><a href="#cb3-11"></a>      <span class="kw">let</span> year <span class="ot">=</span> record <span class="op">^?</span> (field <span class="st">&quot;Year&quot;</span> <span class="op">.</span> text)</span>
+<span id="cb3-12"><a href="#cb3-12"></a>      <span class="kw">let</span> val  <span class="ot">=</span> record <span class="op">^?</span> (field <span class="st">&quot;Value&quot;</span> <span class="op">.</span> text)</span>
+<span id="cb3-13"><a href="#cb3-13"></a>      <span class="co">-- Returning a monoid instance (list) combines results.</span></span>
+<span id="cb3-14"><a href="#cb3-14"></a>      <span class="fu">return</span> <span class="op">$</span> <span class="kw">case</span> (name, year, val) <span class="kw">of</span></span>
+<span id="cb3-15"><a href="#cb3-15"></a>        (<span class="dt">Just</span> key, <span class="dt">Just</span> <span class="st">&quot;2020&quot;</span>, <span class="dt">Just</span> val) <span class="ot">-&gt;</span> [ (key, <span class="fu">read</span> <span class="op">$</span> T.unpack val) ]</span>
+<span id="cb3-16"><a href="#cb3-16"></a>        _ <span class="ot">-&gt;</span> []</span></code></pre></div>
+<p>Note how lenses look almost like <code>XPath</code> expressions. The <code>features</code> function just takes the original features and appends a new key:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1"></a><span class="ot">features ::</span> <span class="dt">Map.Map</span> <span class="dt">T.Text</span> <span class="dt">Scientific</span> <span class="ot">-&gt;</span> <span class="dt">Reader</span> <span class="dt">Json.Value</span> [ <span class="dt">Json.Value</span> ]</span>
+<span id="cb4-2"><a href="#cb4-2"></a>features popMap <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb4-3"><a href="#cb4-3"></a>  magnify (key <span class="st">&quot;features&quot;</span> <span class="op">.</span> values) <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb4-4"><a href="#cb4-4"></a>    feature <span class="ot">&lt;-</span> ask</span>
+<span id="cb4-5"><a href="#cb4-5"></a>    <span class="kw">let</span> <span class="dt">Just</span> <span class="fu">id</span> <span class="ot">=</span> feature <span class="op">^?</span> (key <span class="st">&quot;id&quot;</span> <span class="op">.</span> _String) <span class="co">-- Gross, but effective</span></span>
+<span id="cb4-6"><a href="#cb4-6"></a>    <span class="fu">return</span> <span class="op">$</span> <span class="kw">case</span> (Map.lookup <span class="fu">id</span> popMap) <span class="kw">of</span></span>
+<span id="cb4-7"><a href="#cb4-7"></a>      <span class="dt">Just</span> pop <span class="ot">-&gt;</span> [ feature <span class="op">&amp;</span> key <span class="st">&quot;properties&quot;</span> <span class="op">.</span> _Object <span class="op">.</span> at <span class="st">&quot;pop2020&quot;</span> <span class="op">?~</span>  <span class="dt">Json.Number</span> pop ]</span>
+<span id="cb4-8"><a href="#cb4-8"></a>      _ <span class="ot">-&gt;</span> [ feature ]</span></code></pre></div>
+<p>That is really all it takes to perform the transformation. Please take a look at the full listing in <a href="https://gist.github.com/7cb4fd07bc8689f5c3bccb58b2e239ae#file-etl-hs">this gist</a>. Even with the imports, it cannot get much shorter or expressive than this fifty something lines…</p>
+<h2 id="revenge-of-the-nerds">Revenge of the Nerds</h2>
+<p>So Haskell turns out to be the most practical, straightforward solution I found for this kind of problems. Who knew?</p>
+<p>I would absolutely not recommend learning Haskell just to solve this kind of problems (although I would absolutely recommend learning it for many other reasons). This is one of the occasions in which learning something just for the sake of it pays off in unexpected ways.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>No lengend! No arrow pointing north! Questionable projection! This is not a post on map making, just an image to ease the reader’s eye after too much text for the internet…<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
 
 <div class="panel panel-default">
     <div class="panel-body">
         <div class="pull-left">
-            Tags: <a href="/tags/postgres.html">postgres</a>, <a href="/tags/postgis.html">postgis</a>, <a href="/tags/curve.html">curve</a>, <a href="/tags/inflection.html">inflection</a>, <a href="/tags/GIS.html">GIS</a>
+            Tags: <a href="/tags/haskell.html">haskell</a>, <a href="/tags/data.html">data</a>, <a href="/tags/xml.html">xml</a>, <a href="/tags/json.html">json</a>, <a href="/tags/geojson.html">geojson</a>
         </div>
         <div class="social pull-right">
             <span class="twitter">
-                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2022/28/06/postgis-curve-inflection.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2022/03/27/etl-the-haskell-way.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
             </span>
 
              <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
@@ -137,8 +135,8 @@
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
     
 ]]></description>
-    <pubDate>Sun, 06 Feb 2022 00:00:00 UT</pubDate>
-    <guid>http://jarnaldich.me/blog/2022/28/06/postgis-curve-inflection.html</guid>
+    <pubDate>Sun, 27 Mar 2022 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2022/03/27/etl-the-haskell-way.html</guid>
     <dc:creator>Joan Arnaldich</dc:creator>
 </item>
 <item>
