@@ -1,7 +1,7 @@
 ---
 title: ETL The Haskell Way
 date: 2022-03-27T00:00:00
-tags: haskell, data
+tags: haskell, data, xml, json, geojson
 ---
 
 Extract Transform Load (ETL) is a broad term for processes that read a subset
@@ -92,7 +92,7 @@ the result more than about the software itself. Having to create a new app each
 time can be tiresome, so using scripting and knowing you can rely on a set of
 curated libraries to get the job done is really nice. Starting with a script
 that can be turned at any time into a full blown app that works on all the major
-platforms is also nice.
+platforms is a plus.
 
 ## The Solution
 
