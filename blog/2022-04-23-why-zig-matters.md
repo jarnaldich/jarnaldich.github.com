@@ -130,7 +130,7 @@ which is basically [all you would
 do](https://gdal.org/tutorials/raster_api_tut.html) to open a dataset in C, too.
 
 Now, we get to play around a bit with what is being done here. Zig is strongly
-typed, but has automatic type inference, so we didn't care to declare them. One
+typed, but has automatic type inference, so we didn't care to declare types. One
 cool feature of Zig is its ability to run code at compile time (for C users,
 imagine having a preprocessor that is C itself; for lisp users: you already know
 that stuff). We can treat types as values at compilation time, which means adding this:
@@ -156,13 +156,98 @@ That means Zig will treat `gdal.GDALOpen` as a function that:
   equivalent of a `void*`.
   
 So, not surprisingly, what we get out of the box is more or less the same
-"safety" we would get using C.
+"safety" we would get using C. Compare it with the [original C API](https://gdal.org/api/raster_c_api.html#_CPPv48GDALOpenPKc10GDALAccess)
+
+```C
+typedef void *GDALDatasetH
+// and
+GDALDatasetH GDALOpen(const char *pszFilename, GDALAccess eAccess)
+```
 
 We can easily improve on that for enhanced security and ergonomics, but _we do
-not have to_. In any case, I will develop that further in a follow up post. This
-was just intended to whet your appetite on what it is possible with Zig.
+not have to_. For example, there are two easy to spot danger points:
+
+1. all kind of object handles in the original C have a
+`void*` type, which means you can pass a `DataSet` handle to a [function
+expecting a Driver
+handle](https://gdal.org/api/raster_c_api.html#_CPPv422GDALGetDriverShortName11GDALDriverH),
+for example. 
+2. `GDALAccess` is just an `int`, so you could pass the wrong constant.
+3. You can also forget to check if the returned handle is null. 
+
+both problems can be addressed at the same time by writing an more or less
+trivial "adaptor" layer. For example, we can define a `struct` that wraps the C
+handle, so that we can make use of the type system to avoid mistake number 1.
+
+```zig
+pub const DataSet = struct {
+    handle: *anyopaque,
+};
+```
+
+We can type our `access` enum too, so that we do not pass around the wrong constant:
+
+```zig
+pub const Access = enum(c_int) {
+    ReadOnly = gdal.GA_ReadOnly,
+    Update = gdal.GA_Update,
+};
+```
+
+Then our open function would be:
+
+```zig
+
+pub fn open(fname: []const u8, access: Access) !DataSet {
+    var buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    std.mem.copy(u8, buffer[0..fname.len], fname);
+    buffer[fname.len] = 0;
+
+    const handle_ = gdal.GDALOpen(@ptrCast([*c]const u8, fname), @enumToInt(access));
+    if (handle_) |handle| {
+        return DataSet{ .handle = handle };
+    }
+    return error.OpenError;
+}
+```
+
+The first three lines are just there to turn the preferred `zig` string format
+to the preferrec C one. I admit it's kind of annoying, but it certainly helps in
+terms of ergonomics (paths in the zig standard library are `[]const u8`, not
+`[*c]const u8`). Besides that, note that we return a DataSet *value* or an error
+(the `!DAtaSet` is an error union, with the error set automatically inferred),
+which also means we are forcing the callers of this function to take into
+account that it may fail. For example trying to use it like this:
+
+```zig
+    const ds = zigdal.open(pos, zigdal.Access.Update);
+```
+
+Will result in a compiler error as soon as we try to use the value:
+
+```
+.\src\main.zig:61:52: error: cannot convert error union to payload type. consider using `try`, `catch`, or `if`. expected type 'zigdal.Handle()', found '@typeInfo(@typeInfo(@TypeOf(zigdal.open)).Fn.return_type.?).ErrorUnion.error_set!zigdal.Handle()'
+ 
+```
+
+Thus preventing problem number 3.
+
+One example of the robust zig layer usage would be:
+
+```zig
+    const ds = try zigdal.open(pos, zigdal.Access.Update);
+    defer zigdal.close(ds);
+```
+
+I have started a repo at github to experiment with this wrapper. It is still
+very rough, but in case you are curious about the whole picture, you will find
+it [here](https://github.com/jarnaldich/zigeo).
 
 ## Conclusion
+
+Zig allows us to start using C libraries right away, and gradually add security
+features. Just by adding a few lines of code, a whole family of runtime issues
+can be detected at compile time.
 
 In my (begginer's) opinion, Zig proposition of value is unique and much needed,
 so I really hope the language succeeds. That said, the competition in the system's
@@ -175,3 +260,4 @@ work on this areas so far seems to have been equally great, so...).
 ## Further reading
 
 - https://kristoff.it/blog/maintain-it-with-zig/
+- https://castillodel.github.io/compile-time-evaluation/
