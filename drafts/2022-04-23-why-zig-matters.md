@@ -8,21 +8,22 @@ tags: zig, C, gdal
 
 On a [recent article](https://gankra.github.io/blah/c-isnt-a-language/) worth
 reading, Aria Bingessner makes her point about C not being a language anymore,
-but (through its ill-defined ABI) the _lingua franca_ of programming.
+but (despite its ill-defined ABI) the _lingua franca_ of programming.
 
-I used to like C. Undefined behaviours did not bother me much because most of
-the times I was able to control the environment in which my code ran in terms
+I used to like C back in the day. Undefined behaviours did not bother me much
+because most of
+the times I was able to control the execution environment in terms
 of compiler, architecture and OS. Or at least that is what I used to tell 
-myself, because, while it is true that do not bother me _while writing code_,
-one of the consequences of these behaviours was one of the main reasons I would try to avoid it
-in a modern project involving systems programming:
-the very fact that writing portable code is so hard makes having a package
-manager especially difficult (that is why there are training videos on
+myself because, if they did not bother me _while writing code_,
+a direct implication of these behaviours was the main reason I would try to avoid C 
+in any modern project:
+the very fact that writing portable code is so hard makes having a _package
+manager_ (and code reuse in general) harder: that is why there are training videos on
 [conan](https://academy.jfrog.com/path/conan) but you can figure out
-[cargo](https://doc.rust-lang.org/cargo/guide/dependencies.html)
-for dependency management in minutes). For me, modern systems programming
+[cargo](https://doc.rust-lang.org/cargo/guide/dependencies.html
+in an afternoon. For me, modern systems programming
 languages like [Rust](https://www.rust-lang.org/), [Go](https://go.dev/) or [Swift](https://www.swift.org/)
-are not that much about the language itself, but being able to easily share and
+are not only about the language itself, but about being able to easily share and
 reuse code.
 
 Still, using any of these languages means having to rely on C's ABI (with all
