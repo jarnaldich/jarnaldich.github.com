@@ -7,8 +7,116 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Sun, 27 Mar 2022 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Fri, 22 Apr 2022 01:00:00 UT</lastBuildDate>
         <item>
+    <title>Cloud Optimized Vector</title>
+    <link>http://jarnaldich.me/blog/2022/04/22/cloud-optimized-vector.html</link>
+    <description><![CDATA[<h1>Cloud Optimized Vector</h1>
+
+<small>Posted on April 22, 2022 <a href="/blog/2022/04/22/cloud-optimized-vector.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>A few days ago a coworker of mine sent me a <a href="http://blog.cleverelephant.ca/2022/04/coshp.html">recent article</a> by Paul Ramsey (of <a href="http://blog.cleverelephant.ca/projects">Postgis et al.</a> fame) reflecting on what would a Cloud Optimized Vector format look like. His shocking proposal was … (didn’t see that coming)… shapefiles!</p>
+<p>I understand the article was written as a provocation for thought and as such makes some really good points. I also think that the general discussion over what a “cloud optimized vector” format would look like can be productive, but I am afraid that some less experienced developers (or, God forbid, managers!) would take the proposal of pushing shapefiles as the next cloud format a bit too literally, so I thought I would give some context and counterpoint to that article.</p>
+<p>Him being Paul Ramsey and me being… well… <a href="/about.html">me</a>, I’d better motivate my opinion, so here comes a longish post. I will try to analyze what makes something <em>cloud optimized</em> based on the COG experience, see how that could be applied to a vector format, then justify why shapefiles should be (once again) avoided and finally see if we can get any closer to an ideal cloud vector format.</p>
+<h2 id="what-makes-something-cloud-optimized-anyway">What makes something <em>cloud optimized</em> anyway?</h2>
+<p><a href="https://www.cogeo.org/">Cloud Optimized GeoTiffs</a> are technically just a name for a GeoTiff with a <a href="https://github.com/cogeotiff/cog-spec/blob/master/spec.md">particular internal organization</a> (the sequencing of the bytes on disk). Tiff is a old format (old as in <em>venerable</em>) that allows for huge flexibility in terms of internal storage, data types, etc… For example, an image can be stored on disk one line after the other or, as is the case with COG, in small square “mini images” called tiles. Those tiles are then arranged in a larger grid and then several coarser-resolution layers (called overviews) of such grids can be stacked together to form an <a href="https://en.wikipedia.org/wiki/Pyramid_(image_processing)">image pyramid</a>.</p>
+<img src="/images/pyramid.jpeg" title="fig:pyramid mage" class="center" width="400" alt=" " />
+<p>
+<center>
+<small>Source: OsGEO Wiki</small>
+</center>
+</p>
+<p>Of course, all data is properly indexed within the file so that accessing a tile of any pyramid level is easy (seeking byte ranges and at most some trivial multiplications or additions).</p>
+<p>Whenever data is fetched in chunks through a channel with some latency (be it disk transfer or network), the efficiency of the overall processing can be improved by organizing data in the same order it will be read by the algorithm to compensate for the cost of setting up each read operation (seek times of spinning disks or protocol overhead in network communications).</p>
+<p>A corollary of this is being that <em>data formats are not efficient per se</em>, in the void: it will always depend on the process/algorithm/use case. For example, for a raster point operation (such as applying a threshold mask for some value), organizing data line by line with no overviews is more efficient than a COG would be (…and that is why the Geotiff allow for different configurations).</p>
+<p>When dealing with spatial data, that principle gets hit by a loose version of <a href="https://en.wikipedia.org/wiki/Tobler%27s_first_law_of_geography">Tobler’s First Law</a>: data representing an area nearby is more likely to be accessed next. For example, when a user is viewing an image, tiles that are close to the ones on screen are more likely to be fetched next than tiles representing remote areas (because users pan, do not jump randomly).</p>
+<p>So what is the use case COG is having in mind? Well, in case you hadn’t figured it out already, it is mainly <em>visualization</em><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>. Overviews allow for zooming in and out efficiently and tiles help with moving along a subset of the higher resolution.</p>
+<p>This pattern has been the ABC of raster optimization for decades in the geospatial world. Be it <a href="https://mapproxy.org/docs/1.13.0/caches.html">tile caches</a>, <a href="https://www.ogc.org/standards/tms">tiling schemes</a>, <a href="https://mapserver.org/optimization/raster.html">WMS map servers</a>, etc… they all<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> try to have the same properties:</p>
+<ol type="1">
+<li>Efficient navigation along contiguous resolutions (through overviews, pyramids, wavelets).</li>
+<li>Efficient access of contiguous areas at a given resolution (tiling).</li>
+</ol>
+<p>This also turns out to be a pretty sensible organization if you cannot know in advance what kind of processing will be performed, because it gives you fast access to a manageble piece of the data: be it a summary (overview) or a subset (a slice of tiles) or a combination of both.</p>
+<p>Notice what it does <em>not</em> allow, though: it leaves you in the dry if you need a subset based on the <em>content</em> of the data: eg. I would like to see all pixels with a red channel value of 42: in that case you would have to read the whole image.</p>
+<p>COG is just a name for a GeoTiff implementing that organization. It goes a bit further than that by forcing a particular order<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> of the inner sections, which is smart because a client can ask for a chunk at the beginning and it will take all the directores (think indices, metadata) and probably some overviews, which makes sense, because most viewers will start with the lowest zoom that covers the bounding box. It is also a nice organization for <em>streaming</em> tiles of data.</p>
+<p>With that in mind, what would it mean for a vector format to be “cloud ready”? Well it sure should allow for the visualization use case, and here it would mean loosely speaking “rendering a map”, so that gives us an idea:</p>
+<ol type="1">
+<li>Having the ability to navigate different <em>zoom levels</em> / scales / generalization(s).</li>
+<li>Efficient rendering of nearby areas at a given resolutions.</li>
+</ol>
+<p>Notice that point 1 <em>as a process</em> is much harder in vector than in raster formats: for rasters it is (mostly) a question of choosing what “summary” measure we pick for the overview pixel corresponding to the underlying level (nearest neighbor, interpolation, average, other…). Generalizing a vector is much harder, first because it can break topology and geometry validity in many ways, but also because deciding if/how to represent different features at different scales requires for cartographic design knowledge. But that is not relevant <em>for the format itself</em>, it just needs to be flexible enough to allow for different geometries at different resolutions and be efficient in navigating the different resolutions (we do not care how hard it was to generate the different resolution levels).</p>
+<p>While I think these two requirements are the equivalent of what a COG offers for raster, I am unsure we would consider that enough in the vector case. For example, we might not consider acceptable not being able to have subsets or summaries based on attribute values, so there is a whole new level of complexity for vector <em>at the format level</em> as well. It all boils down if by <em>vector</em> we mean <em>features</em> or just <em>geometries</em>.</p>
+<p>Now that I’ve established the two conditions I think define <em>cloud optimization</em>, at least by COG standards, let’s first dive into why I would say Shapefiles are <em>not</em> the future of the cloud.</p>
+<h2 id="the-noble-art-of-bashing-shapefiles">The noble art of bashing shapefiles</h2>
+<p>A lot has been argued over the years on the <a href="http://switchfromshapefile.org/">problems with shapefiles</a>. I will just refer here the problems specifically relevant in a cloud setting.</p>
+<p>First, they are a multiple file format. There is a cost in the OS layer for opening a file (name resolution, checking permissions), and the web server will probably add another layer on top of that, so please let’s not choose a format for the cloud that means opening a .shp, .dbf, .prj, .dbx, .qix… and <a href="https://desktop.arcgis.com/en/arcmap/10.3/manage-data/shapefiles/shapefile-file-extensions.htm">potencially all of these</a>.</p>
+<p>It’s limited to 2GB of file size. Most COGs are effectively BigTiffs, and easily <em>need</em> to go far beyond that. In any case, one of the reasons for moving to the cloud is being able to process larger data.</p>
+<p>As for the use cases, they’re not even good for representation: you need several of them, one for each layer/geometry, to make most general maps (except maybe choropleths and other thematic maps). That already means multiplying the number of files even more.</p>
+<p>Secondly, Paul’s article seems to care about property number 2: accessing contiguous areas at a given resolution. That is not cloud ready in the same way COGs are. We also need multi-scale map representation (property 1). You can of course use some sort of attribute to filter which elements should appear at different resolution levels, but that means attribute indexing and clashes with spatial ordering. The other option would be using different shapefiles for different layers so, even more files.</p>
+<p>The tool for spatial ordering the article suggests would certainly be useful for a streaming algorithm where spatial contiguity is relevant, but then again there are <a href="https://flatgeobuf.org/">options tailored for this use case</a>.</p>
+<h1 id="is-there-a-better-option">Is there a better option?</h1>
+<p>For the representation use case which is what COGS provide, there certainly is, and has been around for a long time. It’s just that we call them <a href="https://docs.mapbox.com/data/tilesets/guides/vector-tiles-introduction/">vector tiles</a>.</p>
+<p>Vector tiles are exactly the application of the old tiling schema idea to vectors. It’s just that instead of mini-images, we have a <code>pbf</code> encoding of an <a href="github.com/mapbox/vector-tile-spec/tree/master/2.1#41-layers">format</a> for encoding geometries and attributes.</p>
+<p>Those tiles are then organized into a the same organization of grids and pyramids for different resolutions that we had in a COG. It’s just that most of the times, the tiling is not dependent of the dataset (though it can be), but <a href="https://www.maptiler.com/google-maps-coordinates-tile-bounds-projection/#3/15.00/50.00">globally fixed</a>, with a set of well-known tile schemas.</p>
+<p>The tiles can have different schemas and information at different resolution levels (zoom) to allow for different generalization and visualization options.</p>
+<p>We can pack all those tiles into a single <code>.mbtiles</code> file, which is a <code>sqlite</code>-based format containing the tiles as a blob. Having a global tile scheme is nice because you can then use sqlite’s <code>.attach</code> command to merge datasets, for example. And you can include any metadata (projection, etc…) inside a single file.</p>
+<p>And of course there are libraries for rendering them in the browser (that is their primary use case), among <a href="https://github.com/mapbox/awesome-vector-tiles">many other things</a>. But Paul already knows that, since <a href="https://postgis.net/docs/ST_AsMVT.html">PostGis</a> itself can generate them.</p>
+<h1 id="are-we-there-yet">Are we there yet?</h1>
+<p>Well, for representation, at least we are close… but if we want more complex queries over that (think spatial SQL)? With an <code>.mbtiles</code> alone you would need to actually decode each <code>.pbf</code> and query the attributes, so no luck there…</p>
+<p>In a sqlite-based format (like <code>.mbtiles</code> or GeoPackage), it should be possible to extra tables for queries that may or may not reference to the main tiles… but that’s an idea yet to be developed…</p>
+<p>The other caveat for <em>vector tiles</em> is the possible loss of information as a general geometry repository. Internal VT coordinates are integers (mainly because they are optimal for screen rendering algorithms), so that means there is a discrete resolution for each zoom level. Special care has to be taken into account so that there is no loss of information (ie. making sure the zoom levels are enough for the internal raster cell to be below the resolution of the measuring instruments). So again, they may not be suitable for every application.</p>
+<h1 id="conclusion">Conclusion</h1>
+<p>I hope I made my point on why I do not think shapefiles are the future of the cloud based vector formats (I wrote this in a bit of a hurry). I <em>do</em> think there is an interesting space to explore, though… Of course I may be completely wrong and maybe Peter has actually found something. Time will tell, I guess…</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>The trick is that some cloud processing platforms such as the <a href="https://earthengine.google.com/">Google Earth Engine</a> are in fact processing on a <em>visualization driven</em> also called <em>lazy</em> processing scheme: only the data that is visualized at any moment by the user gets processed, on demand, so the same principle applies.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2" role="doc-endnote"><p>Actually, not all, there are more sophisticated methods like wavelet transforms allowing for multi-resolution decoding in formats like .ECW/MrSID (commercial) or JP2000, but for the purpose of this post let’s just call it a very sophisitcated pyramid.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3" role="doc-endnote"><p>For many applications, the hard requirements are tiles and overviews. The order of IFDs may not have much of an impact. I encourage the user to try and read a “regular” tiled tiff through <code>/vsicurl/</code> in QGIS. Or even a raster geopackage, for that matter.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/vector.html">vector</a>, <a href="/tags/vector-tiles.html">vector-tiles</a>, <a href="/tags/mbtiles.html">mbtiles</a>, <a href="/tags/sqlite.html">sqlite</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2022/04/22/cloud-optimized-vector.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+]]></description>
+    <pubDate>Fri, 22 Apr 2022 01:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2022/04/22/cloud-optimized-vector.html</guid>
+    <dc:creator>Joan Arnaldich</dc:creator>
+</item>
+<item>
     <title>ETL The Haskell Way</title>
     <link>http://jarnaldich.me/blog/2022/03/27/etl-the-haskell-way.html</link>
     <description><![CDATA[<h1>ETL The Haskell Way</h1>
@@ -1276,104 +1384,6 @@ gen[1].sync: 3</code></pre>
 ]]></description>
     <pubDate>Mon, 09 Sep 2013 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2013/09/08/haskell-gotchas-strings.html</guid>
-    <dc:creator>Joan Arnaldich</dc:creator>
-</item>
-<item>
-    <title>Raw Strings in Factor</title>
-    <link>http://jarnaldich.me/blog/2013/02/24/raw-strings-in-factor.html</link>
-    <description><![CDATA[<h1>Raw Strings in Factor</h1>
-
-<small>Posted on February 24, 2013 <a href="/blog/2013/02/24/raw-strings-in-factor.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
-
-<p>Ok, you may think I have a fixation with <a href="/blog/2011/08/07/raw-strings-in-racket.html">raw strings</a>, but if you’re like most developers and have used different languages through the years, you probably know the feeling of wanting to port your favourite features from language to language.</p>
-<!-- more -->
-<p>Most languages just won’t let you do anything about it, but then, happily, there is also a whole family of <em>programmable programming languages</em>: <a href="http://www.paulgraham.com/chameleon.html">Lisps</a> being the most notable members among them.</p>
-<p>But there are, for sure, other languages in other sometimes forgotten paradigms.</p>
-<h2 id="concatenative">Concatenative</h2>
-<p><a href="http://factorcode.org">Factor</a> is a so-called <a href="http://concatenative.org/wiki/view/Concatenative%20language">concatenative</a> language. More precisely, it a <a href="http://c2.com/cgi/wiki?StackBasedLanguage">stack-based one</a>. What sets it apart from other concatenative languages IMHO is that it’s a <em>general purpose</em> (Forth is more oriented towards embedded systems) <em>practical</em> (not just a theoretical tool) and <em>modern</em>: its creator Slava Pestov and the development team have brilliantly shown how object orientation, incremental compilation, and bunch of advanced language features can be put to work in a concatenative language.</p>
-<h2 id="factor-as-a-shell">Factor as a shell</h2>
-<p>Factor has a very terse syntax. This can be good or bad, depending on your application and the way your brain is wired up. Lately, I’ve started using its <a href="http://re-factor.blogspot.com.es/2010/09/visual-repl.html">visual repl</a> as an os shell on steroids (I’ll eventually blog on the experience). I think it makes sense since I spend a good share of my time on Windows and I’m not crazy about the syntax of Powershell. A shell is clearly one of the applications where less typing is just the right thing, and the stack-based model sometimes feels like a natural upgrade of unix piping (I’m thinking of the <a href="http://docs.factorcode.org/content/article-dataflow-combinators.html">dataflow combinators</a> here).</p>
-<h2 id="raw-strings">Raw strings</h2>
-<p>And, of course, being able to shamelessly use backslashes inside strings is something you ask of a windows shell. I want to be able to type something like:</p>
-<pre class="factor"><code>r| \\Server\share| directory-files</code></pre>
-<p>Notice the space after the first vertical bar. This is typical of Factor, you’ll see why in a moment.</p>
-<p>As a Factor newbie, there are two things you can do. One is to RTFM, which is extensive and well-written:</p>
-<blockquote>
-<p>The Factor parser follows a simple recursive-descent design. The parser reads successive tokens from the input; if the token identifies a number or an ordinary word, it is added to an accumulator vector. Otherwise if the token identifies a parsing word, the parsing word is executed immediately.</p>
-</blockquote>
-<p>The other one is to check the implementation of something close to what’s intended. This is extremely easy in Factor, since most of the Factor libraries are implemented in Factor itself and the help system lets you navigate through the definitions. The solution presented here is inspired by the regex-introducing parsing word <a href="http://docs.factorcode.org/content/word-R__slash__,regexp.html"><code>R/</code></a>.</p>
-<p>So it looks like we’ll need to introduce a word that will hook up to a function whose responsibility will be to push a string into the accumulator. Something like:</p>
-<pre class="factor"><code>SYNTAX: r| CHAR: | parsing-raw ;</code></pre>
-<p>This means that the parser will immediately evaluate <code>124 parsing-raw</code> after seeing the introductory <code>r|</code>. since this introductory word is handled by the default lexer and parser, there needs to be a space after it for Factor to process the end of word. This might seem unnatural if you do not know Factor, but it is consistent with the rest of the language.</p>
-<p>124 is the ascii code for the vertical bar, which will act as a terminator of the string to parse. Passing the terminator as a parameter will make things easier if we decide to change the separators someday.</p>
-<h2 id="the-lexer">The lexer</h2>
-<p>For our purpose, we cannot work at the parser level: we don’t deal with words, numbers or already-constructed strings. If we want to construct a Factor string in a different way, we’ll have to call the lexer directly. The lexer is stored in a <a href="http://docs.factorcode.org/content/article-namespaces.html">dynamic variable</a> named <code>lexer</code>.</p>
-<pre class="factor"><code>: parsing-raw ( accum end -- accum )
-        lexer get take-until suffix! ;</code></pre>
-<p><code>parsing raw</code> is reponsible for taking input until the <code>end</code> character (124) is reached, and then suffixing the accumulator with the newly parsed string.</p>
-<p>The actual parsing is done in the <code>take-until</code> word:</p>
-<pre class="factor"><code>: take-until ( end lexer -- string )
-        [
-                [ 1 + ] dip
-                [ index-from ] 2keep
-                [ swapd subseq ]
-                [ 2drop 1 + ] 3bi
-        ] change-lexer-column ;</code></pre>
-<p>The word <code>change-lexer-column</code> calls its quotation with the column and the line text of the lexer at that moment. The first line, then, just skips that blank we talked earlier following the introductory word <code>r|</code>. The next two lines find the positon of the terminator (<code>index-from</code>) and extract the string accordingly (<code>subseq</code>). At the end of the quotation <code>change-lexer-column</code> finds the new lexer column at the top of the stack, and just below it lies our return value: the raw string.</p>
-<p>Let’s give it a try:</p>
-<pre class="factor"><code>IN: scratchpad r| \\Server\share|
-
---- Data stack:
-&quot;\\\\Server\\share&quot;
-IN: scratchpad </code></pre>
-<h2 id="conclusion">Conclusion</h2>
-<p>Extending Factor’s syntax is quite straightforward. The linked documentation system and source code browser are an extremely helpful resource to learn the language.</p>
-<p>As pointed out after a question in the <a href="http://dir.gmane.org/gmane.comp.lang.factor.general">mailing list</a>, my solution lacks a way to escape characters. Check out the reference at the end of the article to see how Factor’s “real” string parser deals with them.</p>
-<h2 id="resources">Resources</h2>
-<ul>
-<li>Slava’s post on <a href="http://factor-language.blogspot.com.es/2009/09/survey-of-domain-specific-languages-in.html">writing DSLs on Factor</a> gives a nice overview of Factor’s self-modifying capabilities.</li>
-<li>The <a href="http://docs.factorcode.org/content/article-parsing-words.html">docs</a> of course.</li>
-<li>The <a href="https://github.com/slavapestov/factor/blob/master/core/strings/parser/parser.factor">string parser code</a>, to see how “real” Factor strings are parsed. Interesting to see how Factor deals with escape characters.</li>
-</ul>
-
-<div class="panel panel-default">
-    <div class="panel-body">
-        <div class="pull-left">
-            Tags: <a href="/tags/factor.html">factor</a>, <a href="/tags/concatenative.html">concatenative</a>
-        </div>
-        <div class="social pull-right">
-            <span class="twitter">
-                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2013/02/24/raw-strings-in-factor.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
-            </span>
-
-             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
-             <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
-  size="medium"></g:plusone>
-             </span>
-            
-        </div>
-    </div>
-</div>
-
-<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
-
-<div id="disqus_thread"></div>  
-<script type"text/javascript">
-      var disqus_shortname = 'jarnaldich';
-      (function() {
-          var dsq = document.createElement('script');
-          dsq.type = 'text/javascript';
-          dsq.async = true;
-          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-      })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-    
-]]></description>
-    <pubDate>Sun, 24 Feb 2013 00:00:00 UT</pubDate>
-    <guid>http://jarnaldich.me/blog/2013/02/24/raw-strings-in-factor.html</guid>
     <dc:creator>Joan Arnaldich</dc:creator>
 </item>
 
