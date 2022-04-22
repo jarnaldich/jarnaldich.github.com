@@ -10,6 +10,9 @@ article](http://blog.cleverelephant.ca/2022/04/coshp.html) by Paul Ramsey (of
 what would a Cloud Optimized Vector format look like. His shocking
 proposal was ... (didn't see that coming)... shapefiles!
 
+![&nbsp;](https://imgs.xkcd.com/comics/duty_calls.png "someone is wrong on the internet"){ .center }
+<p><center><small>Source: xkcd</small></center></p>
+
 I understand the article was written as a provocation for thought and as such
 makes some really good points. I also think that the general discussion over
 what a "cloud optimized vector" format would look like can be productive, but I
@@ -55,7 +58,7 @@ A corollary of this is being that *data formats are not efficient per se*, in
 the void: it will always depend on the process/algorithm/use case. For example,
 for a raster point operation (such as applying a threshold mask for some value),
 organizing data line by line with no overviews is more efficient than a COG
-would be (...and that is why the Geotiff allow for different
+would be (...and that is why the Geotiff spec allows for different
 configurations).
 
 When dealing with spatial data, that principle gets hit by a loose version of [Tobler's First
