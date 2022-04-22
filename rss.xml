@@ -16,6 +16,12 @@
 <small>Posted on April 22, 2022 <a href="/blog/2022/04/22/cloud-optimized-vector.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <p>A few days ago a coworker of mine sent me a <a href="http://blog.cleverelephant.ca/2022/04/coshp.html">recent article</a> by Paul Ramsey (of <a href="http://blog.cleverelephant.ca/projects">Postgis et al.</a> fame) reflecting on what would a Cloud Optimized Vector format look like. His shocking proposal was … (didn’t see that coming)… shapefiles!</p>
+<img src="https://imgs.xkcd.com/comics/duty_calls.png" title="fig:someone is wrong on the internet" class="center" alt=" " />
+<p>
+<center>
+<small>Source: xkcd</small>
+</center>
+</p>
 <p>I understand the article was written as a provocation for thought and as such makes some really good points. I also think that the general discussion over what a “cloud optimized vector” format would look like can be productive, but I am afraid that some less experienced developers (or, God forbid, managers!) would take the proposal of pushing shapefiles as the next cloud format a bit too literally, so I thought I would give some context and counterpoint to that article.</p>
 <p>Him being Paul Ramsey and me being… well… <a href="/about.html">me</a>, I’d better motivate my opinion, so here comes a longish post. I will try to analyze what makes something <em>cloud optimized</em> based on the COG experience, see how that could be applied to a vector format, then justify why shapefiles should be (once again) avoided and finally see if we can get any closer to an ideal cloud vector format.</p>
 <h2 id="what-makes-something-cloud-optimized-anyway">What makes something <em>cloud optimized</em> anyway?</h2>
@@ -28,7 +34,7 @@
 </p>
 <p>Of course, all data is properly indexed within the file so that accessing a tile of any pyramid level is easy (seeking byte ranges and at most some trivial multiplications or additions).</p>
 <p>Whenever data is fetched in chunks through a channel with some latency (be it disk transfer or network), the efficiency of the overall processing can be improved by organizing data in the same order it will be read by the algorithm to compensate for the cost of setting up each read operation (seek times of spinning disks or protocol overhead in network communications).</p>
-<p>A corollary of this is being that <em>data formats are not efficient per se</em>, in the void: it will always depend on the process/algorithm/use case. For example, for a raster point operation (such as applying a threshold mask for some value), organizing data line by line with no overviews is more efficient than a COG would be (…and that is why the Geotiff allow for different configurations).</p>
+<p>A corollary of this is being that <em>data formats are not efficient per se</em>, in the void: it will always depend on the process/algorithm/use case. For example, for a raster point operation (such as applying a threshold mask for some value), organizing data line by line with no overviews is more efficient than a COG would be (…and that is why the Geotiff spec allows for different configurations).</p>
 <p>When dealing with spatial data, that principle gets hit by a loose version of <a href="https://en.wikipedia.org/wiki/Tobler%27s_first_law_of_geography">Tobler’s First Law</a>: data representing an area nearby is more likely to be accessed next. For example, when a user is viewing an image, tiles that are close to the ones on screen are more likely to be fetched next than tiles representing remote areas (because users pan, do not jump randomly).</p>
 <p>So what is the use case COG is having in mind? Well, in case you hadn’t figured it out already, it is mainly <em>visualization</em><a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>. Overviews allow for zooming in and out efficiently and tiles help with moving along a subset of the higher resolution.</p>
 <p>This pattern has been the ABC of raster optimization for decades in the geospatial world. Be it <a href="https://mapproxy.org/docs/1.13.0/caches.html">tile caches</a>, <a href="https://www.ogc.org/standards/tms">tiling schemes</a>, <a href="https://mapserver.org/optimization/raster.html">WMS map servers</a>, etc… they all<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> try to have the same properties:</p>
