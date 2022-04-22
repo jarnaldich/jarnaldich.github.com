@@ -136,7 +136,7 @@ First, they are a multiple file format. There is a cost in the OS layer for
 opening a file (name resolution, checking permissions), and the web server will
 probably add another layer on top of that, so please let's not choose a format
 for the cloud that means opening a .shp, .dbf, .prj, .dbx, .qix... 
-and [potencially all of these](https://desktop.arcgis.com/en/arcmap/10.3/manage-data/shapefiles/shapefile-file-extensions.htm).
+and [potentially all of these](https://desktop.arcgis.com/en/arcmap/10.3/manage-data/shapefiles/shapefile-file-extensions.htm).
 
 It's limited to 2GB of file size. Most COGs are effectively BigTiffs, and easily
 _need_ to go far beyond that. In any case, one of the reasons for moving to the
@@ -195,13 +195,13 @@ generate them.
 
 # Are we there yet?
 
-Well, for representation, at least we are close... but if we want more complex
+Well, for representation, at least we are close... but what if we want more complex
 queries over that (think spatial SQL)? With an `.mbtiles` alone you would need
 to actually decode each `.pbf` and query the attributes, so no luck there...
 
-In a sqlite-based format (like `.mbtiles` or GeoPackage), it
-should be possible to extra tables for queries that may or may not reference to
-the main tiles... but that's an idea yet to be developed...
+In a sqlite-based format (like `.mbtiles` or GeoPackage), it should be possible
+to add extra tables for queries that may or may not reference to the main
+tiles... but that's an idea yet to be developed...
  
 The other caveat for _vector tiles_ is the possible loss of information as a
 general geometry repository. Internal VT coordinates are integers (mainly
@@ -215,10 +215,13 @@ application.
 # Conclusion
 
 I hope I made my point on why I do not think shapefiles are the future of the
-cloud based vector formats (I wrote this in a bit of a hurry). I *do* think
+cloud based vector formats (I wrote this in a bit of a hurry) and, more
+importantly, that the "cloud optimization" concept of the raster world can only
+be applied to the vector formats in a limited way. I *do* think
 there is an interesting space to explore, though... Of course I may be
-completely wrong and maybe Peter has actually found something. Time will tell, I
-guess...
+completely wrong and maybe Peter has actually found something. 
+
+Time will tell, I guess...
 
 [^wavelets]: Actually, not all, there are more sophisticated methods like
     wavelet transforms allowing for multi-resolution decoding in formats like
