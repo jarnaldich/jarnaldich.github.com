@@ -102,7 +102,7 @@ ORDER BY 1,2;
 
                         List of relations
    Schema   |   Name   | Type  |  Owner   |  Size  | Description
-------------+----------+-------+----------+--------+-------------
+------------|----------|-------|----------|--------|-------------
  pg_catalog | pg_class | table | postgres | 136 kB |
 (1 row)
 
@@ -134,7 +134,7 @@ In the result of that query, we can see that attrelid should be an `oid`:
 
 ```
 attnum     |   attname     | Type
------------+---------------+-----------
+-----------|---------------|-----------
          1 | attrelid      | oid
          2 | attname       | name
          ...
@@ -167,6 +167,10 @@ CREATE TEMP TABLE tmp AS SELECT 1::numeric, now() LIMIT 0;
 ```
 
 ## Wrapping up
+
+**UPDATE Dec. 15th 2022:** For any real use case, check _syonfox_'s solution (see comments)
+documented [here](https://gist.github.com/jarnaldich/d5952a134d89dfac48d034ed141e86c5?permalink_comment_id=4401600).
+It is way more powerful than my solution below, which I'll only leave here just to keep things simple in this article.
 
 As usual, **good SW practices apply to DB code, too**, and it is easy to isolate any incompatible
 code just by defining a clear interface in your library: instead of querying
