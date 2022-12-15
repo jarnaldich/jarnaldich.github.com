@@ -100,7 +100,7 @@
 <span id="cb3-26"><a href="#cb3-26"></a></span>
 <span id="cb3-27"><a href="#cb3-27"></a>                        <span class="kw">List</span> <span class="kw">of</span> relations</span>
 <span id="cb3-28"><a href="#cb3-28"></a>   <span class="kw">Schema</span>   |   Name   | <span class="kw">Type</span>  |  Owner   |  <span class="kw">Size</span>  | Description</span>
-<span id="cb3-29"><a href="#cb3-29"></a><span class="co">------------+----------+-------+----------+--------+-------------</span></span>
+<span id="cb3-29"><a href="#cb3-29"></a><span class="co">------------|----------|-------|----------|--------|-------------</span></span>
 <span id="cb3-30"><a href="#cb3-30"></a> pg_catalog | pg_class | <span class="kw">table</span> | postgres | <span class="dv">136</span> kB |</span>
 <span id="cb3-31"><a href="#cb3-31"></a>(<span class="dv">1</span> <span class="kw">row</span>)</span></code></pre></div>
 <p>Gives you a quite descriptive (and corner-case complete) template to start your own code from. For example, in the former query we could replace the <code>^(pg_class)$</code> regex with some other. Bear in mind that this trick is only helpful with the system catalog approach.</p>
@@ -114,7 +114,7 @@
 <span id="cb4-5"><a href="#cb4-5"></a>  <span class="kw">AND</span> <span class="kw">NOT</span> attisdropped <span class="kw">ORDER</span> <span class="kw">BY</span> attnum;</span></code></pre></div>
 <p>In the result of that query, we can see that attrelid should be an <code>oid</code>:</p>
 <pre><code>attnum     |   attname     | Type
------------+---------------+-----------
+-----------|---------------|-----------
          1 | attrelid      | oid
          2 | attname       | name
          ...
@@ -128,6 +128,7 @@
 <p>As a sidenote, it might be useful to know that we can inspect the data types of any provided query by pretending to turn it into a temporary table. This might be useful for user-provided queries in external tools (injection caveats apply)…</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1"></a><span class="kw">CREATE</span> TEMP <span class="kw">TABLE</span> tmp <span class="kw">AS</span> <span class="kw">SELECT</span> <span class="dv">1</span>:<span class="ch">:numeric</span>, now() <span class="kw">LIMIT</span> <span class="dv">0</span>;</span></code></pre></div>
 <h2 id="wrapping-up">Wrapping up</h2>
+<p><strong>UPDATE Dec. 15th 2022:</strong> For any real use case, check <em>syonfox</em>’s solution (see comments) documented <a href="https://gist.github.com/jarnaldich/d5952a134d89dfac48d034ed141e86c5?permalink_comment_id=4401600">here</a>. It is way more powerful than my solution below, which I’ll only leave here just to keep things simple in this article.</p>
 <p>As usual, <strong>good SW practices apply to DB code, too</strong>, and it is easy to isolate any incompatible code just by defining a clear interface in your library: instead of querying for the catalog everywhere, define just a set of views or functions that expose the introspection information to the rest of your code and work as an API. This way, any future change in system catalogs will not propagate further than those specific views. For example, if your application needs to know about tables and attribute data types, instead of querying the catalog from many places, define a view that works as in interface between the system catalogs and your code. As an example:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">VIEW</span> table_columns <span class="kw">AS</span></span>
 <span id="cb7-2"><a href="#cb7-2"></a><span class="kw">WITH</span> table_oids <span class="kw">AS</span> (</span>
