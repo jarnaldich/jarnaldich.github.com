@@ -551,7 +551,6 @@
 <p>As a sidenote, it might be useful to know that we can inspect the data types of any provided query by pretending to turn it into a temporary table. This might be useful for user-provided queries in external tools (injection caveats apply)…</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1"></a><span class="kw">CREATE</span> TEMP <span class="kw">TABLE</span> tmp <span class="kw">AS</span> <span class="kw">SELECT</span> <span class="dv">1</span>:<span class="ch">:numeric</span>, now() <span class="kw">LIMIT</span> <span class="dv">0</span>;</span></code></pre></div>
 <h2 id="wrapping-up">Wrapping up</h2>
-<p><strong>UPDATE Dec. 15th 2022:</strong> For any real use case, check <em>syonfox</em>’s solution (see comments) documented <a href="https://gist.github.com/jarnaldich/d5952a134d89dfac48d034ed141e86c5?permalink_comment_id=4401600">here</a>. It is way more powerful than my solution below, which I’ll only leave here just to keep things simple in this article.</p>
 <p>As usual, <strong>good SW practices apply to DB code, too</strong>, and it is easy to isolate any incompatible code just by defining a clear interface in your library: instead of querying for the catalog everywhere, define just a set of views or functions that expose the introspection information to the rest of your code and work as an API. This way, any future change in system catalogs will not propagate further than those specific views. For example, if your application needs to know about tables and attribute data types, instead of querying the catalog from many places, define a view that works as in interface between the system catalogs and your code. As an example:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">VIEW</span> table_columns <span class="kw">AS</span></span>
 <span id="cb7-2"><a href="#cb7-2"></a><span class="kw">WITH</span> table_oids <span class="kw">AS</span> (</span>
@@ -573,6 +572,7 @@
 <span id="cb7-18"><a href="#cb7-18"></a>        <span class="kw">AND</span> a.attrelid <span class="op">=</span> toids.<span class="kw">oid</span>)</span>
 <span id="cb7-19"><a href="#cb7-19"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> column_types;</span></code></pre></div>
 <p>I will be assembling some such utility views I find useful in the future in <a href="https://gist.github.com/jarnaldich/d5952a134d89dfac48d034ed141e86c5">this gist</a>.</p>
+<p><strong>UPDATE Dec. 15th 2022:</strong> For any real use case, check <em>syonfox</em>’s solution (see comments) documented <a href="https://gist.github.com/jarnaldich/d5952a134d89dfac48d034ed141e86c5?permalink_comment_id=4401600">here</a>. It is way more powerful than my solution above, which I’ll only leave here just to keep things simple in this article.</p>
 
 <div class="panel panel-default">
     <div class="panel-body">
