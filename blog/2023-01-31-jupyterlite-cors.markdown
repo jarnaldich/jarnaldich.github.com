@@ -32,9 +32,12 @@ analysis in the browser, as well as a lot of webassembly "ports" of existing
 applications with networking capabilities, since the original desktop apps
 were not designed to deal with this kind of restrictions[^webvm].
 
+![&nbsp;](/images/cors.png "CORS"){.center}
+
 For example, if you are using the Jupyterlite at `jupyterlite.github.io`, you
 will not be able to fetch any server beyond `github.io` that does not allow for
-it specifically... which many data providers don't. You will either need to
+it specifically... which many data providers don't. The request will be blocked
+by the browser itself (step 2 in the diagram above). You will either need to
 download yourself the data and upload it to JupyterLite, or self-host
 JupyterLite and the data in your own server (using it as a proxy for data
 requests), which kinda takes all the convenience out of it. As an example,
@@ -166,24 +169,38 @@ To clarify, you should either use a python kernel with the `%%javascript` magic
 or the javascript kernel in *both* the definition and the call, otherwise they
 won't see each other.
 
+Then from a python cell we can read it the standard way:
+
+```python
+import json
+import pandas as pd
+
+with open('data/menors.json', 'r') as f:
+  data = json.load(f)
+  
+pd.read_json(json.dumps(data['result']['records']))
+```
+
 ## Conclusions
 
-- It is fun and easy to extend JupyterLite.
+- We are just starting to see the potential of WebAssembly based solutions and the
+  browser environment (IndexedDB...).
 
 - If you are a data provider, you should seriously consider enabling CORS to
   promote the usage of your data. Otherwise you will be banning a growing market of
   web-based analysis tools from your data.
 
-![&nbsp;](/images/tiles5k.png "Orthophoto Tiling"){.center}
 
 ## References
 
 - Simple IndexedDB [example](https://gist.github.com/JamesMessinger/a0d6389a5d0e3a24814b)
-- Sample code for reading and writing files in JupyterLite: https://github.com/jupyterlite/jupyterlite/discussions/91?sort=new
-
-## Datasets that allow CORS
-
-- https://catalog.data.gov/dataset/?res_format=CSV
+- [Sample code](https://github.com/jupyterlite/jupyterlite/discussions/91?sort=new) for
+  reading and writing files in JupyterLite (this is where the idea for this post
+  comes from).
+- [On CORS](https://enable-cors.org/) and how to enable it. 
+- A test [web page](https://www.test-cors.org/) to check if a server is CORS enabled.
+- Some data providers with CORS enabled:
+    - <https://catalog.data.gov/dataset/?res_format=CSV>
  
 [^webvm]: If you are curious about the possible solutions to this problems, you
     may like to read how [WebVM](https://webvm.io/), a server-less virtual
