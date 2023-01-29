@@ -67,8 +67,8 @@ print(text)
 There are two ways in which a data provider can accept cross-origin requests. The
 main one (the canonical, modern one) is known as _Cross Origin Resource Sharing_
 (CORS). By adding explicit permission in some dedicated HTTP headers, a resource
-provider can control _who_ (the world or selected domains) and _how_ (which HTTP
-methods) can reuse their data.
+provider can control _who_ can access their data (the world or selected domains)
+and _how_ (which HTTP methods).
 
 Whenever this is not possible or practical (it needs access to the HTTP
 server configuration, and some hosting providers may not allow it), there is a
@@ -80,8 +80,8 @@ The JSONP callback works along these lines:
 
 1. The calling page (eg. JupyterLite) defines a callback function, with a data parameter.
 2. The calling page (JupyterLite) loads a script from the data provider, passing
-   a the name of the callback function.
-3. The data provider script calls the callback function with the requested data.
+   the name of the callback function.
+3. The data provider script calls back the function with the requested data.
    
 Since the script was downloaded from the data provider's domain, it can perform
 requests to that domain, so CORS restrictions do not apply. 
@@ -200,12 +200,11 @@ GIST](https://gist.github.com/6418a53b50568a2b201bf592d854c0df#file-pythonjsonph
 
 - We are just starting to see the potential of WebAssembly based solutions and the
   browser environment (IndexedDB...). This will increase the demand for data
-  openness through origins.
+  accessibility across origins.
 
-- If you are a data provider, you should seriously consider enabling CORS to
+- If you are a data provider, please consider enabling CORS to
   promote the usage of your data. Otherwise you will be banning a growing market of
   web-based analysis tools from your data.
-  
 
 
 ## References
@@ -216,10 +215,8 @@ GIST](https://gist.github.com/6418a53b50568a2b201bf592d854c0df#file-pythonjsonph
   comes from).
 - [On CORS](https://enable-cors.org/) and how to enable it. 
 - [An w3 article](https://www.w3.org/wiki/CORS_Enabled) on how to open your data
-  by enabling CORS and why it is important.
+  by enabling CORS and why it is important, with a list of providers implementing it.
 - A test [web page](https://www.test-cors.org/) to check if a server is CORS enabled.
-- Some data providers with CORS enabled:
-    - <https://catalog.data.gov/dataset/?res_format=CSV>
  
 [^webvm]: If you are curious about the possible solutions to this problems, you
     may like to read how [WebVM](https://webvm.io/), a server-less virtual
