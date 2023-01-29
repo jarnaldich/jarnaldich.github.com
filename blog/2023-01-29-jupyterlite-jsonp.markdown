@@ -1,6 +1,6 @@
 ---
 title: Dealing with CORS in JupyterLite
-date: 2023-01-31T00:00:00
+date: 2023-01-29T00:00:00
 tags: jupyterlite, CORS, data, data, webassembly
 ---
 
@@ -17,20 +17,28 @@ of Open Data initiatives, such as the [EU Open
 Data](https://data.europa.eu/en/publications/open-data-maturity/2022).
 
 But, as soon as you try to use JupyterLite to directly fetch data from those
-sites, you find yourself stumping on a wall named CORS.
+sites, you find yourself stumping on a wall named [Same Origin
+Policy](https://portswigger.net/web-security/cors/same-origin-policy).
 
-## Cross Origin Request Policy
+## Same Origin Policy
 
-The Cross Origin Request Policiy (CORS) is a protection system designed to prevent a
-family of attacks known as Cross Site Scripting or XSS. Browsers implement this
-protection by not allowing a page to perform requests to a server that is
-different from where it wast downloaded unless this other server explicitly
-allows for it.
+The Same Origin Policiy is a protection system designed to guarantee that
+resource providers (hosts) can restrict usage of their data to the pages
+they host. This is the safe thing to do when there is user data involved, since
+it prevents third parties to gain access to eg. the user's cookies and session id's.
+
+Notice that, when there is no user data involved, it is perfectly safe to relax
+this policy. In fact, as we will see, it is desirable to do so.
+
+Browsers implement this protection by not allowing a page to perform requests to
+a server that is different from where it was downloaded unless this other
+server explicitly allows for it.
 
 This behaviour bites hard at any application involving third party data
 analysis in the browser, as well as a lot of webassembly "ports" of existing
 applications with networking capabilities, since the original desktop apps
-were not designed to deal with this kind of restrictions[^webvm].
+were not designed to deal with this kind of restrictions[^webvm] in the first
+place.
 
 ![&nbsp;](/images/cors.png "CORS"){.center}
 
@@ -57,8 +65,12 @@ print(text)
 ```
 
 There are two ways in which a data provider can accept cross-origin requests. The
-main one (the "canonical" one) is by adding explicit permission in the HTTP
-headers. Whenever this is not possible or practical (it needs access to the HTTP
+main one (the canonical, modern one) is known as _Cross Origin Resource Sharing_
+(CORS). By adding explicit permission in some dedicated HTTP headers, a resource
+provider can control _who_ (the world or selected domains) and _how_ (which HTTP
+methods) can reuse their data.
+
+Whenever this is not possible or practical (it needs access to the HTTP
 server configuration, and some hosting providers may not allow it), there is a
 second way: the JSONP callback.
 
@@ -181,14 +193,19 @@ with open('data/menors.json', 'r') as f:
 pd.read_json(json.dumps(data['result']['records']))
 ```
 
+You can find a notebook with the whole code for your convenience [in this
+GIST](https://gist.github.com/6418a53b50568a2b201bf592d854c0df#file-pythonjsonphelper-ipynb).
+
 ## Conclusions
 
 - We are just starting to see the potential of WebAssembly based solutions and the
-  browser environment (IndexedDB...).
+  browser environment (IndexedDB...). This will increase the demand for data
+  openness through origins.
 
 - If you are a data provider, you should seriously consider enabling CORS to
   promote the usage of your data. Otherwise you will be banning a growing market of
   web-based analysis tools from your data.
+  
 
 
 ## References
@@ -198,6 +215,8 @@ pd.read_json(json.dumps(data['result']['records']))
   reading and writing files in JupyterLite (this is where the idea for this post
   comes from).
 - [On CORS](https://enable-cors.org/) and how to enable it. 
+- [An w3 article](https://www.w3.org/wiki/CORS_Enabled) on how to open your data
+  by enabling CORS and why it is important.
 - A test [web page](https://www.test-cors.org/) to check if a server is CORS enabled.
 - Some data providers with CORS enabled:
     - <https://catalog.data.gov/dataset/?res_format=CSV>
