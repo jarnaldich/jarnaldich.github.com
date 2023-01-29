@@ -7,8 +7,182 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Thu, 08 Dec 2022 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Sun, 29 Jan 2023 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Dealing with CORS in JupyterLite</title>
+    <link>http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html</link>
+    <description><![CDATA[<h1>Dealing with CORS in JupyterLite</h1>
+
+<small>Posted on January 29, 2023 <a href="/blog/2023/01/29/jupyterlite-jsonp.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>Following my <a href="blog/2022/12/08/data-manipulation-jupyterlite.html">previous post</a>, I am intending to see how far I can push JupyterLite as a platform for data analysis in the browser. The convenience of having a full enviroment with a sensible default set of libraries for dealing with data <a href="https://jupyterlite.github.io/demo/lab/index.html">one link away</a> is really something I could use.</p>
+<p>But of course, for data analysis you need… well… data. There is certainly no shortage of public datasets on the internet, many of them falling into some sort of Open Data initiatives, such as the <a href="https://data.europa.eu/en/publications/open-data-maturity/2022">EU Open Data</a>.</p>
+<p>But, as soon as you try to use JupyterLite to directly fetch data from those sites, you find yourself stumping on a wall named <a href="https://portswigger.net/web-security/cors/same-origin-policy">Same Origin Policy</a>.</p>
+<h2 id="same-origin-policy">Same Origin Policy</h2>
+<p>The Same Origin Policiy is a protection system designed to guarantee that resource providers (hosts) can restrict usage of their data to the pages they host. This is the safe thing to do when there is user data involved, since it prevents third parties to gain access to eg. the user’s cookies and session id’s.</p>
+<p>Notice that, when there is no user data involved, it is perfectly safe to relax this policy. In fact, as we will see, it is desirable to do so.</p>
+<p>Browsers implement this protection by not allowing a page to perform requests to a server that is different from where it was downloaded unless this other server explicitly allows for it.</p>
+<p>This behaviour bites hard at any application involving third party data analysis in the browser, as well as a lot of webassembly “ports” of existing applications with networking capabilities, since the original desktop apps were not designed to deal with this kind of restrictions<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> in the first place.</p>
+<figure>
+<img src="/images/cors.png" title="CORS" class="center" alt="" /><figcaption> </figcaption>
+</figure>
+<p>For example, if you are using the Jupyterlite at <code>jupyterlite.github.io</code>, you will not be able to fetch any server beyond <code>github.io</code> that does not allow for it specifically… which many data providers don’t. The request will be blocked by the browser itself (step 2 in the diagram above). You will either need to download yourself the data and upload it to JupyterLite, or self-host JupyterLite and the data in your own server (using it as a proxy for data requests), which kinda takes all the convenience out of it. As an example, evaluating this snippet in JupyterLite works exactly as you would expect:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-2"><a href="#cb1-2"></a><span class="im">from</span> js <span class="im">import</span> fetch</span>
+<span id="cb1-3"><a href="#cb1-3"></a></span>
+<span id="cb1-4"><a href="#cb1-4"></a>WORKS <span class="op">=</span> <span class="st">&quot;https://raw.githubusercontent.com/jupyterlite/jupyterlite/main/examples/data/iris.csv&quot;</span></span>
+<span id="cb1-5"><a href="#cb1-5"></a>WORKS_CORS_ENABLED  <span class="op">=</span> <span class="st">&quot;https://data.wa.gov/api/views/f6w7-q2d2/rows.csv?accessType=DOWNLOAD&quot;</span></span>
+<span id="cb1-6"><a href="#cb1-6"></a>FAILS_CORS_DISABLED <span class="op">=</span> <span class="st">&quot;https://opendata-ajuntament.barcelona.cat/data/dataset/1121f3e2-bfb1-4dc4-9f39-1c5d1d72cba1/resource/69ae574f-adfc-4660-8f81-73103de169ff/download/2018_menors.csv&quot;</span></span>
+<span id="cb1-7"><a href="#cb1-7"></a></span>
+<span id="cb1-8"><a href="#cb1-8"></a>res <span class="op">=</span> <span class="cf">await</span> fetch(WORKS)</span>
+<span id="cb1-9"><a href="#cb1-9"></a>text <span class="op">=</span> <span class="cf">await</span> res.text()</span>
+<span id="cb1-10"><a href="#cb1-10"></a><span class="bu">print</span>(text)</span></code></pre></div>
+<p>There are two ways in which a data provider can accept cross-origin requests. The main one (the canonical, modern one) is known as <em>Cross Origin Resource Sharing</em> (CORS). By adding explicit permission in some dedicated HTTP headers, a resource provider can control <em>who</em> can access their data (the world or selected domains) and <em>how</em> (which HTTP methods).</p>
+<p>Whenever this is not possible or practical (it needs access to the HTTP server configuration, and some hosting providers may not allow it), there is a second way: the JSONP callback.</p>
+<h2 id="the-jsonp-callback">The JSONP Callback</h2>
+<p>The JSONP callback works along these lines:</p>
+<ol type="1">
+<li>The calling page (eg. JupyterLite) defines a callback function, with a data parameter.</li>
+<li>The calling page (JupyterLite) loads a script from the data provider, passing the name of the callback function.</li>
+<li>The data provider script calls back the function with the requested data.</li>
+</ol>
+<p>Since the script was downloaded from the data provider’s domain, it can perform requests to that domain, so CORS restrictions do not apply.</p>
+<p>This is not the recommended solution because it delegates to the application something that belongs to another layer: both the server and the consuming webpage have to modified. One typical use case is making older browsers work. The other is kind of accidental: downloading from (poorly configured?) Open Data portals. Most Open Data portals (including administrative ones) use pre-built data management systems such as <a href="https://ckan.org">CKAN</a>. These often can handle JSONP by default, while http servers have CORS disabled by default. So keeping the defaults leaves you with JSONP.</p>
+<h2 id="implementing-a-jsonp-helper-in-jupyterlite">Implementing a JSONP helper in JupyterLite</h2>
+<p>One of the things I love about the browser as a platform is that it is… pretty hackable… just press F12 and you can enter the kitchen. For example, you can see how JupyterLite “fakes” its filesystem on top of <a href="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API">IndexedDB</a>, wich is an API for storing persistent data in the browser.</p>
+<p>So, we have a way to perform CORS requests and get data from a server implementing JSONP, and we can also fiddle with JupyterLite’s virtual filesystem… would it be possible to write a helper to download datasets into the virtual filesystem? You bet! Just paste the following code in a javascript kernel cell, or use the <code>%%javascript</code> magic in a python one:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb2-1"><a href="#cb2-1"></a><span class="va">window</span>.<span class="at">saveJSONP</span> <span class="op">=</span> <span class="kw">async</span> (urlString<span class="op">,</span> file_path<span class="op">,</span> mime_type<span class="op">=</span><span class="st">&#39;text/json&#39;</span><span class="op">,</span> binary<span class="op">=</span><span class="kw">false</span>) <span class="kw">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-2"><a href="#cb2-2"></a>    <span class="kw">const</span> sc <span class="op">=</span> <span class="va">document</span>.<span class="at">createElement</span>(<span class="st">&#39;script&#39;</span>)<span class="op">;</span></span>
+<span id="cb2-3"><a href="#cb2-3"></a>    <span class="kw">var</span> url <span class="op">=</span> <span class="kw">new</span> <span class="at">URL</span>(urlString)<span class="op">;</span></span>
+<span id="cb2-4"><a href="#cb2-4"></a>    <span class="va">url</span>.<span class="va">searchParams</span>.<span class="at">append</span>(<span class="st">&#39;callback&#39;</span><span class="op">,</span> <span class="st">&#39;window.corsCallBack&#39;</span>)<span class="op">;</span></span>
+<span id="cb2-5"><a href="#cb2-5"></a>    </span>
+<span id="cb2-6"><a href="#cb2-6"></a>    <span class="va">sc</span>.<span class="at">src</span> <span class="op">=</span> <span class="va">url</span>.<span class="at">toString</span>()<span class="op">;</span></span>
+<span id="cb2-7"><a href="#cb2-7"></a></span>
+<span id="cb2-8"><a href="#cb2-8"></a>    <span class="va">window</span>.<span class="at">corsCallBack</span> <span class="op">=</span> <span class="kw">async</span> (data) <span class="kw">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-9"><a href="#cb2-9"></a>        <span class="va">console</span>.<span class="at">log</span>(data)<span class="op">;</span></span>
+<span id="cb2-10"><a href="#cb2-10"></a></span>
+<span id="cb2-11"><a href="#cb2-11"></a>        <span class="co">// Open (or create) the file storage</span></span>
+<span id="cb2-12"><a href="#cb2-12"></a>        <span class="kw">var</span> open <span class="op">=</span> <span class="va">indexedDB</span>.<span class="at">open</span>(<span class="st">&#39;JupyterLite Storage&#39;</span>)<span class="op">;</span></span>
+<span id="cb2-13"><a href="#cb2-13"></a></span>
+<span id="cb2-14"><a href="#cb2-14"></a>        <span class="co">// Create the schema</span></span>
+<span id="cb2-15"><a href="#cb2-15"></a>        <span class="va">open</span>.<span class="at">onupgradeneeded</span> <span class="op">=</span> <span class="kw">function</span>() <span class="op">{</span></span>
+<span id="cb2-16"><a href="#cb2-16"></a>            <span class="cf">throw</span> <span class="at">Error</span>(<span class="st">&#39;Error opening IndexedDB. Should not ever need to upgrade JupyterLite Storage Schema&#39;</span>)<span class="op">;</span></span>
+<span id="cb2-17"><a href="#cb2-17"></a>        <span class="op">};</span></span>
+<span id="cb2-18"><a href="#cb2-18"></a></span>
+<span id="cb2-19"><a href="#cb2-19"></a>        <span class="va">open</span>.<span class="at">onsuccess</span> <span class="op">=</span> <span class="kw">function</span>() <span class="op">{</span></span>
+<span id="cb2-20"><a href="#cb2-20"></a>            <span class="co">// Start a new transaction</span></span>
+<span id="cb2-21"><a href="#cb2-21"></a>            <span class="kw">var</span> db <span class="op">=</span> <span class="va">open</span>.<span class="at">result</span><span class="op">;</span></span>
+<span id="cb2-22"><a href="#cb2-22"></a>            <span class="kw">var</span> tx <span class="op">=</span> <span class="va">db</span>.<span class="at">transaction</span>(<span class="st">&quot;files&quot;</span><span class="op">,</span> <span class="st">&quot;readwrite&quot;</span>)<span class="op">;</span></span>
+<span id="cb2-23"><a href="#cb2-23"></a>            <span class="kw">var</span> store <span class="op">=</span> <span class="va">tx</span>.<span class="at">objectStore</span>(<span class="st">&quot;files&quot;</span>)<span class="op">;</span></span>
+<span id="cb2-24"><a href="#cb2-24"></a></span>
+<span id="cb2-25"><a href="#cb2-25"></a>            <span class="kw">var</span> now <span class="op">=</span> <span class="kw">new</span> <span class="at">Date</span>()<span class="op">;</span></span>
+<span id="cb2-26"><a href="#cb2-26"></a></span>
+<span id="cb2-27"><a href="#cb2-27"></a>            <span class="kw">var</span> value <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb2-28"><a href="#cb2-28"></a>                <span class="st">&#39;name&#39;</span><span class="op">:</span> <span class="va">file_path</span>.<span class="at">split</span>(<span class="ss">/</span><span class="sc">[\\/]</span><span class="ss">/</span>).<span class="at">pop</span>()<span class="op">,</span></span>
+<span id="cb2-29"><a href="#cb2-29"></a>                <span class="st">&#39;path&#39;</span><span class="op">:</span> file_path<span class="op">,</span></span>
+<span id="cb2-30"><a href="#cb2-30"></a>                <span class="st">&#39;format&#39;</span><span class="op">:</span> binary <span class="op">?</span> <span class="st">&#39;binary&#39;</span> : <span class="st">&#39;text&#39;</span><span class="op">,</span></span>
+<span id="cb2-31"><a href="#cb2-31"></a>                <span class="st">&#39;created&#39;</span><span class="op">:</span> <span class="va">now</span>.<span class="at">toISOString</span>()<span class="op">,</span></span>
+<span id="cb2-32"><a href="#cb2-32"></a>                <span class="st">&#39;last_modified&#39;</span><span class="op">:</span> <span class="va">now</span>.<span class="at">toISOString</span>()<span class="op">,</span></span>
+<span id="cb2-33"><a href="#cb2-33"></a>                <span class="st">&#39;content&#39;</span><span class="op">:</span> <span class="va">JSON</span>.<span class="at">stringify</span>(data)<span class="op">,</span></span>
+<span id="cb2-34"><a href="#cb2-34"></a>                <span class="st">&#39;mimetype&#39;</span><span class="op">:</span> mime_type<span class="op">,</span></span>
+<span id="cb2-35"><a href="#cb2-35"></a>                <span class="st">&#39;type&#39;</span><span class="op">:</span> <span class="st">&#39;file&#39;</span><span class="op">,</span></span>
+<span id="cb2-36"><a href="#cb2-36"></a>                <span class="st">&#39;writable&#39;</span><span class="op">:</span> <span class="kw">true</span></span>
+<span id="cb2-37"><a href="#cb2-37"></a>            <span class="op">};</span>      </span>
+<span id="cb2-38"><a href="#cb2-38"></a></span>
+<span id="cb2-39"><a href="#cb2-39"></a>            <span class="kw">const</span> countRequest <span class="op">=</span> <span class="va">store</span>.<span class="at">count</span>(file_path)<span class="op">;</span></span>
+<span id="cb2-40"><a href="#cb2-40"></a>            <span class="va">countRequest</span>.<span class="at">onsuccess</span> <span class="op">=</span> () <span class="kw">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-41"><a href="#cb2-41"></a>              <span class="va">console</span>.<span class="at">log</span>(<span class="va">countRequest</span>.<span class="at">result</span>)<span class="op">;</span></span>
+<span id="cb2-42"><a href="#cb2-42"></a>                <span class="cf">if</span>(<span class="va">countRequest</span>.<span class="at">result</span> <span class="op">&gt;</span> <span class="dv">0</span>) <span class="op">{</span></span>
+<span id="cb2-43"><a href="#cb2-43"></a>                    <span class="va">store</span>.<span class="at">put</span>(value<span class="op">,</span> file_path)<span class="op">;</span></span>
+<span id="cb2-44"><a href="#cb2-44"></a>                <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb2-45"><a href="#cb2-45"></a>                    <span class="va">store</span>.<span class="at">add</span>(value<span class="op">,</span> file_path)<span class="op">;</span></span>
+<span id="cb2-46"><a href="#cb2-46"></a>                <span class="op">}</span>   </span>
+<span id="cb2-47"><a href="#cb2-47"></a>            <span class="op">};</span> </span>
+<span id="cb2-48"><a href="#cb2-48"></a></span>
+<span id="cb2-49"><a href="#cb2-49"></a>            <span class="co">// Close the db when the transaction is done</span></span>
+<span id="cb2-50"><a href="#cb2-50"></a>            <span class="va">tx</span>.<span class="at">oncomplete</span> <span class="op">=</span> <span class="kw">function</span>() <span class="op">{</span></span>
+<span id="cb2-51"><a href="#cb2-51"></a>                <span class="va">db</span>.<span class="at">close</span>()<span class="op">;</span></span>
+<span id="cb2-52"><a href="#cb2-52"></a>            <span class="op">};</span></span>
+<span id="cb2-53"><a href="#cb2-53"></a>        <span class="op">}</span></span>
+<span id="cb2-54"><a href="#cb2-54"></a>    <span class="op">}</span></span>
+<span id="cb2-55"><a href="#cb2-55"></a></span>
+<span id="cb2-56"><a href="#cb2-56"></a>    <span class="va">document</span>.<span class="at">getElementsByTagName</span>(<span class="st">&#39;head&#39;</span>)[<span class="dv">0</span>].<span class="at">appendChild</span>(sc)<span class="op">;</span></span>
+<span id="cb2-57"><a href="#cb2-57"></a><span class="op">}</span></span></code></pre></div>
+<p>Then, each time you need to download a file, you can just use the following javascript:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb3-1"><a href="#cb3-1"></a><span class="op">%%</span>javascript</span>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">var</span> url <span class="op">=</span> <span class="st">&#39;https://opendata-ajuntament.barcelona.cat/data/es/api/3/action/datastore_search?resource_id=69ae574f-adfc-4660-8f81-73103de169ff&#39;</span></span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="va">window</span>.<span class="at">saveJSONP</span>(url<span class="op">,</span> <span class="st">&#39;data/menors.json&#39;</span>)</span></code></pre></div>
+<p>To clarify, you should either use a python kernel with the <code>%%javascript</code> magic or the javascript kernel in <em>both</em> the definition and the call, otherwise they won’t see each other.</p>
+<p>Then from a python cell we can read it the standard way:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1"></a><span class="im">import</span> json</span>
+<span id="cb4-2"><a href="#cb4-2"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb4-3"><a href="#cb4-3"></a></span>
+<span id="cb4-4"><a href="#cb4-4"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">&#39;data/menors.json&#39;</span>, <span class="st">&#39;r&#39;</span>) <span class="im">as</span> f:</span>
+<span id="cb4-5"><a href="#cb4-5"></a>  data <span class="op">=</span> json.load(f)</span>
+<span id="cb4-6"><a href="#cb4-6"></a>  </span>
+<span id="cb4-7"><a href="#cb4-7"></a>pd.read_json(json.dumps(data[<span class="st">&#39;result&#39;</span>][<span class="st">&#39;records&#39;</span>]))</span></code></pre></div>
+<p>You can find a notebook with the whole code for your convenience <a href="https://gist.github.com/6418a53b50568a2b201bf592d854c0df#file-pythonjsonphelper-ipynb">in this GIST</a>.</p>
+<h2 id="conclusions">Conclusions</h2>
+<ul>
+<li><p>We are just starting to see the potential of WebAssembly based solutions and the browser environment (IndexedDB…). This will increase the demand for data accessibility across origins.</p></li>
+<li><p>If you are a data provider, please consider enabling CORS to promote the usage of your data. Otherwise you will be banning a growing market of web-based analysis tools from your data.</p></li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li>Simple IndexedDB <a href="https://gist.github.com/JamesMessinger/a0d6389a5d0e3a24814b">example</a></li>
+<li><a href="https://github.com/jupyterlite/jupyterlite/discussions/91?sort=new">Sample code</a> for reading and writing files in JupyterLite (this is where the idea for this post comes from).</li>
+<li><a href="https://enable-cors.org/">On CORS</a> and how to enable it.</li>
+<li><a href="https://www.w3.org/wiki/CORS_Enabled">An w3 article</a> on how to open your data by enabling CORS and why it is important, with a list of providers implementing it.</li>
+<li>A test <a href="https://www.test-cors.org/">web page</a> to check if a server is CORS enabled.</li>
+</ul>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>If you are curious about the possible solutions to this problems, you may like to read how <a href="https://webvm.io/">WebVM</a>, a server-less virtual Debian, implements a general solution <a href="https://leaningtech.com/webvm-virtual-machine-with-networking-via-tailscale/">here</a>.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/jupyterlite.html">jupyterlite</a>, <a href="/tags/CORS.html">CORS</a>, <a href="/tags/data.html">data</a>, <a href="/tags/data.html">data</a>, <a href="/tags/webassembly.html">webassembly</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+]]></description>
+    <pubDate>Sun, 29 Jan 2023 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html</guid>
+    <dc:creator>Joan Arnaldich</dc:creator>
+</item>
+<item>
     <title>Data Manipulation with JupyterLite</title>
     <link>http://jarnaldich.me/blog/2022/12/08/data-manipulation-jupyterlite.html</link>
     <description><![CDATA[<h1>Data Manipulation with JupyterLite</h1>
@@ -1156,233 +1330,6 @@
 ]]></description>
     <pubDate>Wed, 26 Aug 2015 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2015/08/26/upserts-in-postgresql.html</guid>
-    <dc:creator>Joan Arnaldich</dc:creator>
-</item>
-<item>
-    <title>Parallel Voronoi in Haskell</title>
-    <link>http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html</link>
-    <description><![CDATA[<h1>Parallel Voronoi in Haskell</h1>
-
-<small>Posted on December 14, 2013 <a href="/blog/2013/12/14/haskell-voronoi.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
-
-<p>I recently bought a copy of <em>Parallel and Concurrent Programming in Haskell</em>, by Simon Marlow, also available online <a href="http://chimera.labs.oreilly.com/books/1230000000929">here</a>. It’s a very good overview for anyone who (like me) has ever been confused by the wealth of different libraries and primitives for doing concurrency &amp; parallelism in Haskell.</p>
-<p>So I thought I would put what I learned to work with an example of my own. <!-- more --></p>
-<h2 id="repa">Repa</h2>
-<p>A library I found particularly compelling was <a href="http://hackage.haskell.org/package/repa">repa</a>. Quoting from the <a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial">tutorial</a>,</p>
-<blockquote>
-<p>Repa is a Haskell library for high performance, regular, multi-dimensional parallel arrays. All numeric data is stored unboxed and functions written with the Repa combinators are automatically parallel…</p>
-</blockquote>
-<p>Let’s describe what makes <code>repa</code> fast step by step. Note that <code>repa</code> heavily relies on the optimizations performed by the <a href="http://www.haskell.org/ghc/">GHC</a>, so whenever I say Haskell in this post, please think of the <code>GHC</code> stack.</p>
-<h3 id="unboxed-types">Unboxed types</h3>
-<p>Like in many other high-level languages, the default types in GHC are <em>boxed</em>, meaning that they are represented by a pointer to a object in the heap, rather than a primitive type itself. The use of boxed types adds one level of indirection and thus has an impact on performance because of the extra allocation and the loss of locality.</p>
-<p>You can read more about unboxed types <a href="http://www.haskell.org/ghc/docs/7.0.1/html/users_guide/primitives.html">in the manual</a>.</p>
-<h3 id="stream-fusion">Stream fusion</h3>
-<p>Consider a function like this:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1"></a><span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
-<span id="cb1-2"><a href="#cb1-2"></a>squareAddTwo <span class="ot">=</span> <span class="fu">sum</span> <span class="op">.</span> <span class="fu">map</span> (<span class="op">+</span><span class="dv">2</span>) <span class="op">.</span> <span class="fu">map</span> (<span class="op">*</span><span class="dv">3</span>) </span></code></pre></div>
-<p>It is supposed to multiply each element in an integer list by three, add two, and then sum up all the numbers in the list. A naive implementation of the above would use 3 lists: the input list and two intermediate lists for storing the result of the two <code>map</code> operations. These intermediate lists waste time and space doing useless temporary allocation and garbage collection.</p>
-<p>Now, with stream fusion, equational laws are applied to get rid of these intermediate structures in a process called deforestation. The above could be translated into something like:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1"></a>myFoldingSquareAddTwo <span class="ot">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="op">+</span> (y<span class="op">*</span><span class="dv">3</span> <span class="op">+</span> <span class="dv">2</span>)) <span class="dv">0</span></span></code></pre></div>
-<p>Note that recent versions of GHC have deforestation built-in for regular lists, so you can take advantage of fusion provided you stick to the old suspects: <code>map</code>, <code>fold</code>, etc… If you implement your own recursive functions, then GHC will <em>not</em> be able to fuse. Here is a snippet that you can play with. I encourage you to try what is the largest value of <code>n</code> for which this program correctly terminates:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span></span>
-<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">import</span> <span class="dt">System.Environment</span></span>
-<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">import</span> <span class="dt">Data.List</span> (foldl&#39;)</span>
-<span id="cb3-4"><a href="#cb3-4"></a>    </span>
-<span id="cb3-5"><a href="#cb3-5"></a>myMap f [] <span class="ot">=</span> []</span>
-<span id="cb3-6"><a href="#cb3-6"></a>myMap f (h<span class="op">:</span>t) <span class="ot">=</span> f h <span class="op">:</span> myMap f t</span>
-<span id="cb3-7"><a href="#cb3-7"></a></span>
-<span id="cb3-8"><a href="#cb3-8"></a>mySum [] <span class="ot">=</span> <span class="dv">0</span></span>
-<span id="cb3-9"><a href="#cb3-9"></a>mySum (h<span class="op">:</span>t) <span class="ot">=</span> h <span class="op">+</span> mySum t</span>
-<span id="cb3-10"><a href="#cb3-10"></a></span>
-<span id="cb3-11"><a href="#cb3-11"></a>mySquareAddTwo <span class="ot">=</span> mySum <span class="op">.</span> myMap  (<span class="op">+</span><span class="dv">2</span>) <span class="op">.</span> myMap (<span class="op">*</span><span class="dv">2</span>) </span>
-<span id="cb3-12"><a href="#cb3-12"></a></span>
-<span id="cb3-13"><a href="#cb3-13"></a><span class="ot">squareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
-<span id="cb3-14"><a href="#cb3-14"></a>squareAddTwo <span class="ot">=</span> <span class="fu">sum</span> <span class="op">.</span> <span class="fu">map</span> (<span class="op">+</span><span class="dv">2</span>) <span class="op">.</span> <span class="fu">map</span> (<span class="op">*</span><span class="dv">3</span>) </span>
-<span id="cb3-15"><a href="#cb3-15"></a></span>
-<span id="cb3-16"><a href="#cb3-16"></a><span class="ot">myFoldingSquareAddTwo ::</span> [<span class="dt">Int</span>] <span class="ot">-&gt;</span> <span class="dt">Int</span></span>
-<span id="cb3-17"><a href="#cb3-17"></a>myFoldingSquareAddTwo <span class="ot">=</span> foldl&#39; (\x y <span class="ot">-&gt;</span> x <span class="op">+</span> (y<span class="op">*</span><span class="dv">3</span> <span class="op">+</span> <span class="dv">2</span>)) <span class="dv">0</span></span>
-<span id="cb3-18"><a href="#cb3-18"></a></span>
-<span id="cb3-19"><a href="#cb3-19"></a>main <span class="ot">=</span> <span class="kw">do</span></span>
-<span id="cb3-20"><a href="#cb3-20"></a>  [n] <span class="ot">&lt;-</span> getArgs</span>
-<span id="cb3-21"><a href="#cb3-21"></a>  <span class="fu">print</span> <span class="op">$</span> squareAddTwo [<span class="dv">1</span><span class="op">..</span><span class="fu">read</span><span class="ot"> n ::</span> <span class="dt">Int</span>]</span>
-<span id="cb3-22"><a href="#cb3-22"></a>  <span class="fu">print</span> <span class="op">$</span> myFoldingSquareAddTwo [<span class="dv">1</span><span class="op">..</span><span class="fu">read</span><span class="ot"> n ::</span> <span class="dt">Int</span>]        </span>
-<span id="cb3-23"><a href="#cb3-23"></a>  <span class="fu">print</span> <span class="op">$</span> mySquareAddTwo [<span class="dv">1</span><span class="op">..</span><span class="fu">read</span><span class="ot"> n ::</span> <span class="dt">Int</span>]  </span></code></pre></div>
-<h3 id="automatic-parallelism">Automatic parallelism</h3>
-<p>Repa provides a set of combinators for creating and manipulating arrays. The operations needed to build an array are described declaratively in a first step (creating a so-called <em>delayed</em> array), and then the array is later materialized (which will give an <em>unboxed</em> array).</p>
-<p>This double process allows for <code>repa</code> not only to fuse away the intermediate structures, but also to perform the required data dependency analysis prior to parallelizing the computation.</p>
-<p>Hopefully, the Voronoi example will help you understand this process.</p>
-<h2 id="voronoi">Voronoi</h2>
-<p>Quoting from the <a href="http://en.wikipedia.org/wiki/Voronoi_diagram">wikipedia</a>:</p>
-<blockquote>
-<p>In mathematics, a Voronoi diagram is a way of dividing space into a number of regions. A set of points (called seeds, sites, or generators) is specified beforehand and for each seed there will be a corresponding region consisting of all points closer to that seed than to any other. The regions are called Voronoi cells</p>
-</blockquote>
-<p>So we are trying to get a pretty picture like this one:</p>
-<figure>
-<img src="/images/voronoi.png" title="Voronoi diagram" alt="" /><figcaption>Voronoi diagram</figcaption>
-</figure>
-<p>It is a 512x512 images with 150 random centers. The colored polygons represent the areas which are closest to a particular center. The most popular algorithm for computing a Voronoi diagram in 2 dimensions seems to be <a href="http://en.wikipedia.org/wiki/Fortune&#39;s_algorithm">Fortune’s algorithm</a>. There are also nice open-source implementations out there: for real work, I’d recommend the excellent <a href="http://www.qhull.org/html/qvoronoi.htm">qhull library</a>.</p>
-<p>Since I was just interested in testing parallelism, I decided to implement it the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> way, which boils down to just applying the definition: take an image and a random set of in-range pixel coordinates (the centers). For each pixel, color it according to the center that lies closest (in our case, closest according to the euclidean metric). This algorithm is embarassingly naive, but also <a href="http://en.wikipedia.org/wiki/Embarrassingly_parallel">embarassingly parallel</a>, since each pixel can be computed independently.</p>
-<h2 id="the-source">The Source</h2>
-<p>The code is pretty straightforward. You can find the whole source <a href="https://raw.github.com/jarnaldich/jarnaldich.github.com/master/_src/posts/voronoi.hs">here</a>, or on the <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> page.</p>
-<p>I’ll comment on the most important parts.</p>
-<p>First, we need a function for the metric to minimize. To make it faster, we will not take the square root. We will also use strict annotations and 32 bit unsigned integers (<code>Word32</code>), instead of Haskell’s unbounded <code>Int</code>s. Finally, we will tell GHC to inline it, since <code>Repa</code> recommends making extensive use of inlining (as always, when in doubt, profile).</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1"></a><span class="ot">{-# INLINE sqDistance #-}</span>    </span>
-<span id="cb4-2"><a href="#cb4-2"></a><span class="ot">sqDistance ::</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span> <span class="ot">-&gt;</span> <span class="dt">Word32</span></span>
-<span id="cb4-3"><a href="#cb4-3"></a>sqDistance <span class="op">!</span>x1 <span class="op">!</span>y1 <span class="op">!</span>x2 <span class="op">!</span>y2 <span class="ot">=</span> ((x1<span class="op">-</span>x2)<span class="op">^</span><span class="dv">2</span>) <span class="op">+</span> ((y1<span class="op">-</span>y2)<span class="op">^</span><span class="dv">2</span>)</span></code></pre></div>
-<p>Getting a random array with the centers is easy and shows the way to generate unboxed arrays from a list in <code>repa</code>:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb5-1"><a href="#cb5-1"></a><span class="ot">centers ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM2</span> <span class="dt">Word32</span></span>
-<span id="cb5-2"><a href="#cb5-2"></a>centers nCenters nCells <span class="ot">=</span></span>
-<span id="cb5-3"><a href="#cb5-3"></a>      fromListUnboxed (<span class="dt">Z</span> <span class="op">:.</span> nCenters <span class="op">:.</span> <span class="dv">2</span>)</span>
-<span id="cb5-4"><a href="#cb5-4"></a>    <span class="op">$</span> <span class="fu">take</span> (<span class="dv">2</span><span class="op">*</span>nCenters)</span>
-<span id="cb5-5"><a href="#cb5-5"></a>    <span class="op">$</span> randomRs (<span class="dv">0</span>, <span class="fu">fromIntegral</span> (nCells <span class="op">-</span> <span class="dv">1</span>)) (mkStdGen <span class="dv">1</span>)</span></code></pre></div>
-<p>Note the type signature: <code>Array U DIM2 Word32</code> means unboxed array (the <code>U</code>), indexed by 2 integers (the <code>DIM2</code>) and storing <code>Word32</code> values. The indexing is a bit tricky, since is mostly done with the <code>:.</code> operator, and the notation is somewhat overloaded to denote indexes and shapes, so <code>arr Repa.! (Z:. i :. j)</code> means the element in the ith row and jth column of the array arr, but <code>fromListUnboxed (Z :. nCenters :. 2)</code> means we are creating an array of <code>nCenters</code> rows and 2 columns.</p>
-<p>Now there come two helper functions. The first one takes a 2 column matrix and a two parameter function and returns the array resulting of applying the function to each row.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb6-1"><a href="#cb6-1"></a>applyReduce2 arr f <span class="ot">=</span> </span>
-<span id="cb6-2"><a href="#cb6-2"></a>    <span class="fu">traverse</span> arr (\(i <span class="op">:.</span> j) <span class="ot">-&gt;</span> i) <span class="op">$</span> \<span class="fu">lookup</span> (<span class="dt">Z</span><span class="op">:.</span>i) <span class="ot">-&gt;</span></span>
-<span id="cb6-3"><a href="#cb6-3"></a>        f (<span class="fu">lookup</span> (<span class="dt">Z</span><span class="op">:.</span>i<span class="op">:.</span><span class="dv">0</span>)) (<span class="fu">lookup</span> (<span class="dt">Z</span><span class="op">:.</span>i<span class="op">:.</span><span class="dv">1</span>))</span></code></pre></div>
-<p>In order to do so, this function makes use of a very powerful <code>repa</code> combinator, which takes a function on the indices (in this case, reduces one dimension) and a two parameter function. The first parameter is itself a lookup function on the input array, while the second one is the index of the output array whose value we are trying to compute. Please refer to the <a href="http://www.haskell.org/haskellwiki/Numeric_Haskell:_A_Repa_Tutorial">tutorial</a> if this is not clear enough.</p>
-<p>Apart from <code>traverse</code>, there are more familiar combinators, like <code>foldS</code>, which is just like a fold for arrays. We make use of it to compute the minimum of a function over an array. The final <code>S</code> stands for “sequential”. Some repa combinators come in two flavors: sequential ones or parallel ones (would be <code>foldP</code>). For this algorithm we will parallelize only the pixel loop, so we are using the sequential version for the minimization loop. Here’s the minimization function, which basically decorates the array with an index before folding over it:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb7-1"><a href="#cb7-1"></a>minimize1D arr <span class="ot">=</span> foldS f h t</span>
-<span id="cb7-2"><a href="#cb7-2"></a>  <span class="kw">where</span></span>
-<span id="cb7-3"><a href="#cb7-3"></a>    indexer src idx<span class="op">@</span>(<span class="dt">Z</span> <span class="op">:.</span> i) <span class="ot">=</span> (src idx, (<span class="fu">fromIntegral</span> i))</span>
-<span id="cb7-4"><a href="#cb7-4"></a>    indexed arr <span class="ot">=</span> <span class="fu">traverse</span> arr <span class="fu">id</span> indexer</span>
-<span id="cb7-5"><a href="#cb7-5"></a>    (<span class="dt">Z</span> <span class="op">:.</span> n) <span class="ot">=</span> extent arr</span>
-<span id="cb7-6"><a href="#cb7-6"></a>    iarr <span class="ot">=</span> indexed arr</span>
-<span id="cb7-7"><a href="#cb7-7"></a>    h <span class="ot">=</span> iarr <span class="op">!</span> (<span class="dt">Z</span> <span class="op">:.</span> <span class="dv">0</span>)</span>
-<span id="cb7-8"><a href="#cb7-8"></a>    t <span class="ot">=</span> extract (<span class="dt">Z</span> <span class="op">:.</span> <span class="dv">1</span>) (<span class="dt">Z</span> <span class="op">:.</span> (n<span class="op">-</span><span class="dv">1</span>)) iarr</span>
-<span id="cb7-9"><a href="#cb7-9"></a>    f min<span class="op">@</span>(<span class="op">!</span>valMin, <span class="op">!</span>iMin ) x<span class="op">@</span>(<span class="op">!</span>val, <span class="op">!</span>i) <span class="op">|</span> val <span class="op">&lt;</span> valMin <span class="ot">=</span> x</span>
-<span id="cb7-10"><a href="#cb7-10"></a>                                         <span class="op">|</span> <span class="fu">otherwise</span> <span class="ot">=</span> <span class="fu">min</span></span></code></pre></div>
-<p>With these helpers, writing a parallel voronoi is easy. We will make use of <code>fromFunction</code> to create a <em>delayed</em> array, which we can later force to compute.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb8-1"><a href="#cb8-1"></a><span class="ot">voronoi ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">D</span> <span class="dt">DIM2</span> <span class="dt">Word32</span></span>
-<span id="cb8-2"><a href="#cb8-2"></a>voronoi nCenters nCells <span class="ot">=</span></span>
-<span id="cb8-3"><a href="#cb8-3"></a>    <span class="kw">let</span></span>
-<span id="cb8-4"><a href="#cb8-4"></a>      cellReducer <span class="ot">=</span> applyReduce2 (centers nCenters nCells)</span>
-<span id="cb8-5"><a href="#cb8-5"></a>      nearestCenterIndex <span class="ot">=</span> <span class="fu">snd</span> <span class="op">.</span> (<span class="op">Repa.!</span> <span class="dt">Z</span>) <span class="op">.</span> minimize1D</span>
-<span id="cb8-6"><a href="#cb8-6"></a>      <span class="ot">{-# INLINE builder #-}</span></span>
-<span id="cb8-7"><a href="#cb8-7"></a>      builder (<span class="dt">Z</span><span class="op">:.</span>i<span class="op">:.</span>j) <span class="ot">=</span> nearestCenterIndex</span>
-<span id="cb8-8"><a href="#cb8-8"></a>                        <span class="op">$</span> cellReducer <span class="op">$</span> on sqDistance <span class="fu">fromIntegral</span> i j</span>
-<span id="cb8-9"><a href="#cb8-9"></a>    <span class="kw">in</span>        </span>
-<span id="cb8-10"><a href="#cb8-10"></a>      Repa.fromFunction (<span class="dt">Z</span> <span class="op">:.</span> nCells <span class="op">:.</span><span class="ot"> nCells ::</span> <span class="dt">DIM2</span>) builder</span></code></pre></div>
-<p>The <code>voronoi</code> function creates a matrix of integer indices, referring to the center which is closest. If we want to write that as an RGB image, we will also need a function to create a random color table and another one to colorize the voronoi array:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb9-1"><a href="#cb9-1"></a><span class="ot">genColorTable ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> <span class="dt">Array</span> <span class="dt">U</span> <span class="dt">DIM1</span> (<span class="dt">Word8</span>, <span class="dt">Word8</span>, <span class="dt">Word8</span>)</span>
-<span id="cb9-2"><a href="#cb9-2"></a>genColorTable n <span class="ot">=</span> fromListUnboxed (<span class="dt">Z</span> <span class="op">:.</span> n) <span class="op">$</span> <span class="fu">zip3</span> l1 l2 l3</span>
-<span id="cb9-3"><a href="#cb9-3"></a>    <span class="kw">where</span></span>
-<span id="cb9-4"><a href="#cb9-4"></a>      randoms <span class="ot">=</span> randomRs (<span class="dv">0</span>,<span class="dv">255</span>) (mkStdGen <span class="dv">1</span>)</span>
-<span id="cb9-5"><a href="#cb9-5"></a>      (l1, rest1) <span class="ot">=</span> <span class="fu">splitAt</span> n randoms</span>
-<span id="cb9-6"><a href="#cb9-6"></a>      (l2, rest2) <span class="ot">=</span> <span class="fu">splitAt</span> n rest1</span>
-<span id="cb9-7"><a href="#cb9-7"></a>      l3 <span class="ot">=</span> <span class="fu">take</span> n rest2</span>
-<span id="cb9-8"><a href="#cb9-8"></a></span>
-<span id="cb9-9"><a href="#cb9-9"></a>colorize ctable <span class="ot">=</span> Repa.map <span class="op">$</span> \x <span class="ot">-&gt;</span> ctable <span class="op">Repa.!</span> (<span class="dt">Z</span><span class="op">:.</span> <span class="fu">fromIntegral</span> x)</span></code></pre></div>
-<p>As we can see, the colorized table will be a two dimensional array of 3-element tuples: one for the red, green, and blue components. This is the format expected by <code>writeImageToBMP</code> in the <code>Repa.IO.BMP</code> package.</p>
-<p>with all the above, the main function will look like:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb10-1"><a href="#cb10-1"></a>main <span class="ot">=</span> <span class="kw">do</span></span>
-<span id="cb10-2"><a href="#cb10-2"></a>  <span class="kw">let</span> nsites <span class="ot">=</span> <span class="dv">150</span></span>
-<span id="cb10-3"><a href="#cb10-3"></a>  <span class="kw">let</span> ctable <span class="ot">=</span> genColorTable nsites </span>
-<span id="cb10-4"><a href="#cb10-4"></a>  voro <span class="ot">&lt;-</span> computeP <span class="op">$</span> colorize ctable <span class="op">$</span> voronoi nsites <span class="dv">512</span></span>
-<span id="cb10-5"><a href="#cb10-5"></a>  writeImageToBMP <span class="st">&quot;out.bmp&quot;</span> voro</span></code></pre></div>
-<p>There are some cool things going on under the hood. First, note that we just plugged the <code>colorize</code> and <code>voronoi</code> parts. In spite of this, there will be no intermediate arrays: both calculations will be fused into a single operation.</p>
-<p>The second thing is the use of a parallel combinator <code>computeP</code>, which will transform a delayed array into an unboxed one <em>in parallel</em> (given the appropiate compilation options and runtime parameters). Note that parallel computations in repa must run in some monad, to ensure they are performed in the appropiate order. It can be any monad (in this case, it’s <code>main</code>’s <code>IO</code>).</p>
-<p>Now, if we compile with</p>
-<pre><code>ghc -O2 -fllvm -fforce-recomp -threaded --make voronoi.hs  -o voronoi</code></pre>
-<p>My machine is a somewhat oldish 2GHz Intel Core 2 Duo with 4GB (1067Mhz DDR3) of RAM. We can try to run it on one core:</p>
-<pre><code>$ time ./voronoi
-
-real	0m3.015s
-user	0m2.946s
-sys	0m0.069s</code></pre>
-<p>or on two cores:</p>
-<pre><code>$time ./voronoi +RTS -N2
-
-real	0m1.644s
-user	0m3.101s
-sys	0m0.068s</code></pre>
-<p>Note that the speedup is pretty good. We can also see detailed statistics by the runtime system:</p>
-<pre><code>$ ./voronoi +RTS -N2 -s
-   8,750,790,680 bytes allocated in the heap
-       5,940,344 bytes copied during GC
-         852,168 bytes maximum residency (2 sample(s))
-          49,752 bytes maximum slop
-               5 MB total memory in use (2 MB lost due to fragmentation)
-
-                                  Tot time (elapsed)  Avg pause  Max pause
-Gen  0      8640 colls,  8639 par    0.15s    0.11s     0.0000s    0.0033s
-Gen  1         2 colls,     2 par    0.00s    0.00s     0.0003s    0.0005s
-
-  Parallel GC work balance: 1.78 (690765 / 388167, ideal 2)
-
-                        MUT time (elapsed)       GC time  (elapsed)
-  Task  0 (worker) :    3.00s    (  1.57s)       0.18s    (  0.13s)
-  Task  1 (worker) :    3.18s    (  1.69s)       0.00s    (  0.00s)
-  Task  2 (bound)  :    3.18s    (  1.69s)       0.00s    (  0.00s)
-  Task  3 (worker) :    2.97s    (  1.54s)       0.21s    (  0.15s)
-
-  SPARKS: 0 (0 converted, 0 overflowed, 0 dud, 0 GC&#39;d, 0 fizzled)
-
-  INIT    time    0.00s  (  0.00s elapsed)
-  MUT     time    3.03s  (  1.59s elapsed)
-  GC      time    0.15s  (  0.11s elapsed)
-  EXIT    time    0.00s  (  0.00s elapsed)
-  Total   time    3.18s  (  1.69s elapsed)
-
-  Alloc rate    2,884,832,617 bytes per MUT second
-
-  Productivity  95.3% of total user, 179.1% of total elapsed
-
-gc_alloc_block_sync: 3416
-whitehole_spin: 0
-gen[0].sync: 0
-gen[1].sync: 3</code></pre>
-<p>95% user productivity looks good to me. By comparison, and unoptimized single-core <code>C</code> version out of <a href="http://rosettacode.org/wiki/Voronoi_diagram">Rosetta Code</a> takes somewhat less than 2 seconds, while the optimized one takes around half a second.</p>
-<p>Please, take the times above with a grain of salt: I am sure a seasoned haskeller would squeeze more speed out of my version, and probably the <code>C</code> and the Haskell should’nt be compared in the first place (the output image format is different).</p>
-<h2 id="conclusions">Conclusions</h2>
-<p>As we have seen, writing parallel array operations with a decent performance is easy with <code>Repa</code>. While I am doubtful that it can reach the speed of <code>C</code> without making the code just too ugly, IMHO the balance between speed, ease of development and compositional style makes <code>Repa</code> a worthwhile tool in your bag.</p>
-<h2 id="references">References</h2>
-<p>Here are some cool links if you want to play around with Voronoi diagrams:</p>
-<ul>
-<li><a href="http://bl.ocks.org/mbostock/4060366">Online demo</a></li>
-<li><a href="http://www.raymondhill.net/voronoi/rhill-voronoi.html">Another one</a></li>
-<li><a href="http://www.senchalabs.org/philogl/PhiloGL/examples/voronoi/">A spherical one</a></li>
-<li><a href="http://voronoi.com/wiki/index.php?title=Main_Page">The vorowiki</a></li>
-</ul>
-
-<div class="panel panel-default">
-    <div class="panel-body">
-        <div class="pull-left">
-            Tags: <a href="/tags/haskell.html">haskell</a>, <a href="/tags/voronoi.html">voronoi</a>, <a href="/tags/repa.html">repa</a>, <a href="/tags/parallel.html">parallel</a>
-        </div>
-        <div class="social pull-right">
-            <span class="twitter">
-                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
-            </span>
-
-             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
-             <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
-  size="medium"></g:plusone>
-             </span>
-            
-        </div>
-    </div>
-</div>
-
-<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
-
-<div id="disqus_thread"></div>  
-<script type"text/javascript">
-      var disqus_shortname = 'jarnaldich';
-      (function() {
-          var dsq = document.createElement('script');
-          dsq.type = 'text/javascript';
-          dsq.async = true;
-          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-      })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-    
-]]></description>
-    <pubDate>Sat, 14 Dec 2013 00:00:00 UT</pubDate>
-    <guid>http://jarnaldich.me/blog/2013/12/14/haskell-voronoi.html</guid>
     <dc:creator>Joan Arnaldich</dc:creator>
 </item>
 

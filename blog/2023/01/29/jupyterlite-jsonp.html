@@ -3,23 +3,25 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-        <title>Joan Arnaldich - Home</title>
+        <title>Joan Arnaldich - Dealing with CORS in JupyterLite</title>
 
         <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
 
-        <link href="http://fonts.googleapis.com/css?family=Abel" rel="stylesheet" type="text/css">
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
 
 	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
 
-	<link rel="stylesheet" type="text/css" href="./css/syntax.css" />
-        <link rel="stylesheet" type="text/css" href="./css/custom.css" />
-        <link rel="stylesheet" type="text/css" href="./css/prism.css" />
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
     <body>
-<script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-	<script src="./js/prism.js"></script>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
         <div class="container">
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -29,14 +31,14 @@
 
                         <div style="margin-top:20px;">
                             <div class="row">
-                                <div class="col-md-2"><a href="./"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
 
-                                <div class="col-md-2"><a href="./posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
-                                <div class="col-md-2"><a href="./tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
-                                <div class="col-md-2"><a href="./about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
                                 <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
                                 <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
-                                <div class="col-xs-1"><a href="./rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
                             </div>
                         </div>
                     </div>
@@ -46,7 +48,7 @@
                 <div class="col-md-10 col-md-offset-1">
                     <h1>Dealing with CORS in JupyterLite</h1>
 
-<small>Posted on January 29, 2023 <a href="./blog/2023/01/29/jupyterlite-jsonp.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+<small>Posted on January 29, 2023 <a href="/blog/2023/01/29/jupyterlite-jsonp.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <p>Following my <a href="blog/2022/12/08/data-manipulation-jupyterlite.html">previous post</a>, I am intending to see how far I can push JupyterLite as a platform for data analysis in the browser. The convenience of having a full enviroment with a sensible default set of libraries for dealing with data <a href="https://jupyterlite.github.io/demo/lab/index.html">one link away</a> is really something I could use.</p>
 <p>But of course, for data analysis you need… well… data. There is certainly no shortage of public datasets on the internet, many of them falling into some sort of Open Data initiatives, such as the <a href="https://data.europa.eu/en/publications/open-data-maturity/2022">EU Open Data</a>.</p>
@@ -57,7 +59,7 @@
 <p>Browsers implement this protection by not allowing a page to perform requests to a server that is different from where it was downloaded unless this other server explicitly allows for it.</p>
 <p>This behaviour bites hard at any application involving third party data analysis in the browser, as well as a lot of webassembly “ports” of existing applications with networking capabilities, since the original desktop apps were not designed to deal with this kind of restrictions<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> in the first place.</p>
 <figure>
-<img src="./images/cors.png" title="CORS" class="center" alt /><figcaption> </figcaption>
+<img src="/images/cors.png" title="CORS" class="center" alt="" /><figcaption> </figcaption>
 </figure>
 <p>For example, if you are using the Jupyterlite at <code>jupyterlite.github.io</code>, you will not be able to fetch any server beyond <code>github.io</code> that does not allow for it specifically… which many data providers don’t. The request will be blocked by the browser itself (step 2 in the diagram above). You will either need to download yourself the data and upload it to JupyterLite, or self-host JupyterLite and the data in your own server (using it as a proxy for data requests), which kinda takes all the convenience out of it. As an example, evaluating this snippet in JupyterLite works exactly as you would expect:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
@@ -84,10 +86,10 @@
 <h2 id="implementing-a-jsonp-helper-in-jupyterlite">Implementing a JSONP helper in JupyterLite</h2>
 <p>One of the things I love about the browser as a platform is that it is… pretty hackable… just press F12 and you can enter the kitchen. For example, you can see how JupyterLite “fakes” its filesystem on top of <a href="https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API">IndexedDB</a>, wich is an API for storing persistent data in the browser.</p>
 <p>So, we have a way to perform CORS requests and get data from a server implementing JSONP, and we can also fiddle with JupyterLite’s virtual filesystem… would it be possible to write a helper to download datasets into the virtual filesystem? You bet! Just paste the following code in a javascript kernel cell, or use the <code>%%javascript</code> magic in a python one:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb2-1"><a href="#cb2-1"></a><span class="va">window</span>.<span class="at">saveJSONP</span> <span class="op">=</span> <span class="kw">async</span> (urlString<span class="op">,</span> file_path<span class="op">,</span> mime_type<span class="op">=</span><span class="st">'text/json'</span><span class="op">,</span> binary<span class="op">=</span><span class="kw">false</span>) <span class="kw">=&gt;</span> <span class="op">{</span></span>
-<span id="cb2-2"><a href="#cb2-2"></a>    <span class="kw">const</span> sc <span class="op">=</span> <span class="va">document</span>.<span class="at">createElement</span>(<span class="st">'script'</span>)<span class="op">;</span></span>
+<div class="sourceCode" id="cb2"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb2-1"><a href="#cb2-1"></a><span class="va">window</span>.<span class="at">saveJSONP</span> <span class="op">=</span> <span class="kw">async</span> (urlString<span class="op">,</span> file_path<span class="op">,</span> mime_type<span class="op">=</span><span class="st">&#39;text/json&#39;</span><span class="op">,</span> binary<span class="op">=</span><span class="kw">false</span>) <span class="kw">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-2"><a href="#cb2-2"></a>    <span class="kw">const</span> sc <span class="op">=</span> <span class="va">document</span>.<span class="at">createElement</span>(<span class="st">&#39;script&#39;</span>)<span class="op">;</span></span>
 <span id="cb2-3"><a href="#cb2-3"></a>    <span class="kw">var</span> url <span class="op">=</span> <span class="kw">new</span> <span class="at">URL</span>(urlString)<span class="op">;</span></span>
-<span id="cb2-4"><a href="#cb2-4"></a>    <span class="va">url</span>.<span class="va">searchParams</span>.<span class="at">append</span>(<span class="st">'callback'</span><span class="op">,</span> <span class="st">'window.corsCallBack'</span>)<span class="op">;</span></span>
+<span id="cb2-4"><a href="#cb2-4"></a>    <span class="va">url</span>.<span class="va">searchParams</span>.<span class="at">append</span>(<span class="st">&#39;callback&#39;</span><span class="op">,</span> <span class="st">&#39;window.corsCallBack&#39;</span>)<span class="op">;</span></span>
 <span id="cb2-5"><a href="#cb2-5"></a>    </span>
 <span id="cb2-6"><a href="#cb2-6"></a>    <span class="va">sc</span>.<span class="at">src</span> <span class="op">=</span> <span class="va">url</span>.<span class="at">toString</span>()<span class="op">;</span></span>
 <span id="cb2-7"><a href="#cb2-7"></a></span>
@@ -95,11 +97,11 @@
 <span id="cb2-9"><a href="#cb2-9"></a>        <span class="va">console</span>.<span class="at">log</span>(data)<span class="op">;</span></span>
 <span id="cb2-10"><a href="#cb2-10"></a></span>
 <span id="cb2-11"><a href="#cb2-11"></a>        <span class="co">// Open (or create) the file storage</span></span>
-<span id="cb2-12"><a href="#cb2-12"></a>        <span class="kw">var</span> open <span class="op">=</span> <span class="va">indexedDB</span>.<span class="at">open</span>(<span class="st">'JupyterLite Storage'</span>)<span class="op">;</span></span>
+<span id="cb2-12"><a href="#cb2-12"></a>        <span class="kw">var</span> open <span class="op">=</span> <span class="va">indexedDB</span>.<span class="at">open</span>(<span class="st">&#39;JupyterLite Storage&#39;</span>)<span class="op">;</span></span>
 <span id="cb2-13"><a href="#cb2-13"></a></span>
 <span id="cb2-14"><a href="#cb2-14"></a>        <span class="co">// Create the schema</span></span>
 <span id="cb2-15"><a href="#cb2-15"></a>        <span class="va">open</span>.<span class="at">onupgradeneeded</span> <span class="op">=</span> <span class="kw">function</span>() <span class="op">{</span></span>
-<span id="cb2-16"><a href="#cb2-16"></a>            <span class="cf">throw</span> <span class="at">Error</span>(<span class="st">'Error opening IndexedDB. Should not ever need to upgrade JupyterLite Storage Schema'</span>)<span class="op">;</span></span>
+<span id="cb2-16"><a href="#cb2-16"></a>            <span class="cf">throw</span> <span class="at">Error</span>(<span class="st">&#39;Error opening IndexedDB. Should not ever need to upgrade JupyterLite Storage Schema&#39;</span>)<span class="op">;</span></span>
 <span id="cb2-17"><a href="#cb2-17"></a>        <span class="op">};</span></span>
 <span id="cb2-18"><a href="#cb2-18"></a></span>
 <span id="cb2-19"><a href="#cb2-19"></a>        <span class="va">open</span>.<span class="at">onsuccess</span> <span class="op">=</span> <span class="kw">function</span>() <span class="op">{</span></span>
@@ -111,15 +113,15 @@
 <span id="cb2-25"><a href="#cb2-25"></a>            <span class="kw">var</span> now <span class="op">=</span> <span class="kw">new</span> <span class="at">Date</span>()<span class="op">;</span></span>
 <span id="cb2-26"><a href="#cb2-26"></a></span>
 <span id="cb2-27"><a href="#cb2-27"></a>            <span class="kw">var</span> value <span class="op">=</span> <span class="op">{</span></span>
-<span id="cb2-28"><a href="#cb2-28"></a>                <span class="st">'name'</span><span class="op">:</span> <span class="va">file_path</span>.<span class="at">split</span>(<span class="ss">/</span><span class="sc">[\\/]</span><span class="ss">/</span>).<span class="at">pop</span>()<span class="op">,</span></span>
-<span id="cb2-29"><a href="#cb2-29"></a>                <span class="st">'path'</span><span class="op">:</span> file_path<span class="op">,</span></span>
-<span id="cb2-30"><a href="#cb2-30"></a>                <span class="st">'format'</span><span class="op">:</span> binary <span class="op">?</span> <span class="st">'binary'</span> : <span class="st">'text'</span><span class="op">,</span></span>
-<span id="cb2-31"><a href="#cb2-31"></a>                <span class="st">'created'</span><span class="op">:</span> <span class="va">now</span>.<span class="at">toISOString</span>()<span class="op">,</span></span>
-<span id="cb2-32"><a href="#cb2-32"></a>                <span class="st">'last_modified'</span><span class="op">:</span> <span class="va">now</span>.<span class="at">toISOString</span>()<span class="op">,</span></span>
-<span id="cb2-33"><a href="#cb2-33"></a>                <span class="st">'content'</span><span class="op">:</span> <span class="va">JSON</span>.<span class="at">stringify</span>(data)<span class="op">,</span></span>
-<span id="cb2-34"><a href="#cb2-34"></a>                <span class="st">'mimetype'</span><span class="op">:</span> mime_type<span class="op">,</span></span>
-<span id="cb2-35"><a href="#cb2-35"></a>                <span class="st">'type'</span><span class="op">:</span> <span class="st">'file'</span><span class="op">,</span></span>
-<span id="cb2-36"><a href="#cb2-36"></a>                <span class="st">'writable'</span><span class="op">:</span> <span class="kw">true</span></span>
+<span id="cb2-28"><a href="#cb2-28"></a>                <span class="st">&#39;name&#39;</span><span class="op">:</span> <span class="va">file_path</span>.<span class="at">split</span>(<span class="ss">/</span><span class="sc">[\\/]</span><span class="ss">/</span>).<span class="at">pop</span>()<span class="op">,</span></span>
+<span id="cb2-29"><a href="#cb2-29"></a>                <span class="st">&#39;path&#39;</span><span class="op">:</span> file_path<span class="op">,</span></span>
+<span id="cb2-30"><a href="#cb2-30"></a>                <span class="st">&#39;format&#39;</span><span class="op">:</span> binary <span class="op">?</span> <span class="st">&#39;binary&#39;</span> : <span class="st">&#39;text&#39;</span><span class="op">,</span></span>
+<span id="cb2-31"><a href="#cb2-31"></a>                <span class="st">&#39;created&#39;</span><span class="op">:</span> <span class="va">now</span>.<span class="at">toISOString</span>()<span class="op">,</span></span>
+<span id="cb2-32"><a href="#cb2-32"></a>                <span class="st">&#39;last_modified&#39;</span><span class="op">:</span> <span class="va">now</span>.<span class="at">toISOString</span>()<span class="op">,</span></span>
+<span id="cb2-33"><a href="#cb2-33"></a>                <span class="st">&#39;content&#39;</span><span class="op">:</span> <span class="va">JSON</span>.<span class="at">stringify</span>(data)<span class="op">,</span></span>
+<span id="cb2-34"><a href="#cb2-34"></a>                <span class="st">&#39;mimetype&#39;</span><span class="op">:</span> mime_type<span class="op">,</span></span>
+<span id="cb2-35"><a href="#cb2-35"></a>                <span class="st">&#39;type&#39;</span><span class="op">:</span> <span class="st">&#39;file&#39;</span><span class="op">,</span></span>
+<span id="cb2-36"><a href="#cb2-36"></a>                <span class="st">&#39;writable&#39;</span><span class="op">:</span> <span class="kw">true</span></span>
 <span id="cb2-37"><a href="#cb2-37"></a>            <span class="op">};</span>      </span>
 <span id="cb2-38"><a href="#cb2-38"></a></span>
 <span id="cb2-39"><a href="#cb2-39"></a>            <span class="kw">const</span> countRequest <span class="op">=</span> <span class="va">store</span>.<span class="at">count</span>(file_path)<span class="op">;</span></span>
@@ -139,21 +141,21 @@
 <span id="cb2-53"><a href="#cb2-53"></a>        <span class="op">}</span></span>
 <span id="cb2-54"><a href="#cb2-54"></a>    <span class="op">}</span></span>
 <span id="cb2-55"><a href="#cb2-55"></a></span>
-<span id="cb2-56"><a href="#cb2-56"></a>    <span class="va">document</span>.<span class="at">getElementsByTagName</span>(<span class="st">'head'</span>)[<span class="dv">0</span>].<span class="at">appendChild</span>(sc)<span class="op">;</span></span>
+<span id="cb2-56"><a href="#cb2-56"></a>    <span class="va">document</span>.<span class="at">getElementsByTagName</span>(<span class="st">&#39;head&#39;</span>)[<span class="dv">0</span>].<span class="at">appendChild</span>(sc)<span class="op">;</span></span>
 <span id="cb2-57"><a href="#cb2-57"></a><span class="op">}</span></span></code></pre></div>
 <p>Then, each time you need to download a file, you can just use the following javascript:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb3-1"><a href="#cb3-1"></a><span class="op">%%</span>javascript</span>
-<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">var</span> url <span class="op">=</span> <span class="st">'https://opendata-ajuntament.barcelona.cat/data/es/api/3/action/datastore_search?resource_id=69ae574f-adfc-4660-8f81-73103de169ff'</span></span>
-<span id="cb3-3"><a href="#cb3-3"></a><span class="va">window</span>.<span class="at">saveJSONP</span>(url<span class="op">,</span> <span class="st">'data/menors.json'</span>)</span></code></pre></div>
+<span id="cb3-2"><a href="#cb3-2"></a><span class="kw">var</span> url <span class="op">=</span> <span class="st">&#39;https://opendata-ajuntament.barcelona.cat/data/es/api/3/action/datastore_search?resource_id=69ae574f-adfc-4660-8f81-73103de169ff&#39;</span></span>
+<span id="cb3-3"><a href="#cb3-3"></a><span class="va">window</span>.<span class="at">saveJSONP</span>(url<span class="op">,</span> <span class="st">&#39;data/menors.json&#39;</span>)</span></code></pre></div>
 <p>To clarify, you should either use a python kernel with the <code>%%javascript</code> magic or the javascript kernel in <em>both</em> the definition and the call, otherwise they won’t see each other.</p>
 <p>Then from a python cell we can read it the standard way:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1"></a><span class="im">import</span> json</span>
 <span id="cb4-2"><a href="#cb4-2"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb4-3"><a href="#cb4-3"></a></span>
-<span id="cb4-4"><a href="#cb4-4"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">'data/menors.json'</span>, <span class="st">'r'</span>) <span class="im">as</span> f:</span>
+<span id="cb4-4"><a href="#cb4-4"></a><span class="cf">with</span> <span class="bu">open</span>(<span class="st">&#39;data/menors.json&#39;</span>, <span class="st">&#39;r&#39;</span>) <span class="im">as</span> f:</span>
 <span id="cb4-5"><a href="#cb4-5"></a>  data <span class="op">=</span> json.load(f)</span>
 <span id="cb4-6"><a href="#cb4-6"></a>  </span>
-<span id="cb4-7"><a href="#cb4-7"></a>pd.read_json(json.dumps(data[<span class="st">'result'</span>][<span class="st">'records'</span>]))</span></code></pre></div>
+<span id="cb4-7"><a href="#cb4-7"></a>pd.read_json(json.dumps(data[<span class="st">&#39;result&#39;</span>][<span class="st">&#39;records&#39;</span>]))</span></code></pre></div>
 <p>You can find a notebook with the whole code for your convenience <a href="https://gist.github.com/6418a53b50568a2b201bf592d854c0df#file-pythonjsonphelper-ipynb">in this GIST</a>.</p>
 <h2 id="conclusions">Conclusions</h2>
 <ul>
@@ -178,7 +180,7 @@
 <div class="panel panel-default">
     <div class="panel-body">
         <div class="pull-left">
-            Tags: <a href="./tags/jupyterlite.html">jupyterlite</a>, <a href="./tags/CORS.html">CORS</a>, <a href="./tags/data.html">data</a>, <a href="./tags/data.html">data</a>, <a href="./tags/webassembly.html">webassembly</a>
+            Tags: <a href="/tags/jupyterlite.html">jupyterlite</a>, <a href="/tags/CORS.html">CORS</a>, <a href="/tags/data.html">data</a>, <a href="/tags/data.html">data</a>, <a href="/tags/webassembly.html">webassembly</a>
         </div>
         <div class="social pull-right">
             <span class="twitter">
@@ -187,7 +189,8 @@
 
              <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
              <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/" size="medium"></g:plusone>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
              </span>
             
         </div>
@@ -197,7 +200,7 @@
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
 <div id="disqus_thread"></div>  
-<script type"text javascript">
+<script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
           var dsq = document.createElement('script');
@@ -209,7 +212,6 @@
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
     
-
 
                 </div>
             </div>
