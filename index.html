@@ -104,7 +104,7 @@
 <li>Non-relational DBs may have other ways to ensure schema conformance, e.g. through <a href="https://www.mongodb.com/docs/manual/core/schema-validation/specify-json-schema/">JSON schema</a> or <a href="http://exist-db.org/exist/apps/doc/validation">XML schema</a>.</li>
 <li>The fallback option is to guarantee this “by construction” via application validation, (eg. using drop-downs in the UI), although this is a weaker solution since it incurs in unnecessary coupling… and thing can go sideways anyway, so in this scenario you should consider performing periodic schema validation tests on the data.</li>
 </ul>
-<p>Notice that both of these solutions require <em>a priori</em> knowledge of the domain.</p>
+<p>Notice that all of these solutions require <em>a priori</em> knowledge of the domain.</p>
 <p>But what happens when we are faced with an (underdocumented) dataset and asked to use it as a source for analysis? Or when we are asked to derive these rules <em>a posteriori</em> eg. to improve a legacy database? Well, without knowledge of the domain, it is just not possible to decide wether two similar values are both correct (and just happen to be spelled similarly) or a misspelling. The best thing we can do is to detect which values are indeed similar and raise a flag.</p>
 <p>This is when the techniques explained in this blog post come handy.</p>
 <h2 id="the-algorithm">The algorithm</h2>
