@@ -7,8 +7,193 @@
         <description><![CDATA[Joan Arnaldich's Blog]]></description>
         <atom:link href="http://jarnaldich.me/rss.xml" rel="self"
                    type="application/rss+xml" />
-        <lastBuildDate>Sun, 29 Jan 2023 00:00:00 UT</lastBuildDate>
+        <lastBuildDate>Sun, 19 Feb 2023 00:00:00 UT</lastBuildDate>
         <item>
+    <title>Near Duplicates Detection</title>
+    <link>http://jarnaldich.me/blog/2023/03/19/near-duplicates.html</link>
+    <description><![CDATA[<h1>Near Duplicates Detection</h1>
+
+<small>Posted on February 19, 2023 <a href="/blog/2023/03/19/near-duplicates.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+
+<p>In my <a href="http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html">previous post</a> I set up a tool to ease the download of open datasets into a JupyterLite environment, which is a neat tool to perform simplish data wrangling without local installation.</p>
+<p>In this post we will put that tool to good use for one of the most common data cleaning utilities: near duplicate detection.</p>
+<figure>
+<img src="/images/spiderman_double.png" title="spiderman double" class="center" alt="" /><figcaption> </figcaption>
+</figure>
+<h2 id="why-bother-about-near-duplicates">Why bother about near duplicates?</h2>
+<p>Near duplicates can be a sign of a poor schema implementation, especially when they appear in variables with finite domains (factors). For example, in the following addresses dataset:</p>
+<center>
+<table>
+<thead>
+<tr class="header">
+<th>kind</th>
+<th>name</th>
+<th>number</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>road</td>
+<td>Abbey</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>square</td>
+<td>Level</td>
+<td>666</td>
+</tr>
+<tr class="odd">
+<td>drive</td>
+<td>Mullholand</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td>boulevard</td>
+<td>Broken Dreams</td>
+<td>4</td>
+</tr>
+</tbody>
+</table>
+</center>
+<p/>
+<p>The “kind” variable could predictably take any of the following values:</p>
+<ul>
+<li>road</li>
+<li>square</li>
+<li>avenue</li>
+<li>drive</li>
+<li>boulevard</li>
+</ul>
+<p>The problem is that this kind of data is too often modelled as an unconstrained string, which makes it error prone: ‘sqare’ is just as valid as ‘square’. This generates all kind of problems down the data analysis pipeline: what would happen if we analyze the frequency of each kind?</p>
+<p>There are ways to ensure that the variable “kind” can only take one of those values, depending on the underlying data infrastructure:</p>
+<ul>
+<li>In relational databases one could use <a href="https://www.postgresql.org/docs/current/sql-createdomain.html">domain types</a> , data validation <a href="https://www.postgresql.org/docs/current/sql-createtrigger.html">triggers</a>, or plain old dictonary tables with 1:n relationships.</li>
+<li>Non-relational DBs may have other ways to ensure schema conformance, e.g. through <a href="https://www.mongodb.com/docs/manual/core/schema-validation/specify-json-schema/">JSON schema</a> or <a href="http://exist-db.org/exist/apps/doc/validation">XML schema</a>.</li>
+<li>The fallback option is to guarantee this “by construction” via application validation, (eg. using drop-downs in the UI), although this is a weaker solution since it incurs in unnecessary coupling… and thing can go sideways anyway, so in this scenario you should consider performing periodic schema validation tests on the data.</li>
+</ul>
+<p>Notice that both of these solutions require <em>a priori</em> knowledge of the domain.</p>
+<p>But what happens when we are faced with an (underdocumented) dataset and asked to use it as a source for analysis? Or when we are asked to derive these rules <em>a posteriori</em> eg. to improve a legacy database? Well, without knowledge of the domain, it is just not possible to decide wether two similar values are both correct (and just happen to be spelled similarly) or a misspelling. The best thing we can do is to detect which values are indeed similar and raise a flag.</p>
+<p>This is when the techniques explained in this blog post come handy.</p>
+<h2 id="the-algorithm">The algorithm</h2>
+<p>For the sake of simplicity, in this blog post we will assume our data is small enough so that a quadratic algorithm is acceptable (for the real thing, see the references at the end). Beware that, in modern hardware, this simple case can take you farther than you would initially expect. My advise is to always <em>use the simplest solution that gets the job done</em>. It usually pays off in both development time and incidental complexity (reliance on external dependencies, etc…).</p>
+<p>There are two main metrics regarding similarity. The first one, restricted to strings, is the <a href="https://en.wikipedia.org/wiki/Levenshtein_distance">Levenshtein</a> (aka edit) distance and represents the number of edits needed to go from one string to another. This metric is hard to scale in general, since it requires pairwise comparison.</p>
+<p>The other one is both more general and more scalable. It involves generating n-gram sets and then comparing them using a set-similarity measure.</p>
+<h3 id="n-gram-sets">N-gram sets</h3>
+<p>For each string, we can associate a set of n-grams that can be derived from it. N-grams (sometimes called <em>shingles</em>) are just substrings of length n. A typical case is <code>n=3</code>, which generates what is known as trigrams. For example, the trigram set for the string <code>"algorithm"</code> would be <code>['alg', 'lgo', 'gor', 'ori', 'rit', 'ith', 'thm']</code>.</p>
+<h3 id="jaccard-index">Jaccard Index</h3>
+<p>Once we have the n-gram set for a string, we can use a general metric for set similarity. A popular one is the <a href="https://en.wikipedia.org/wiki/Jaccard_index">Jaccard Index</a>. Which is defined as the ratio between the cardinality of intersection over the cardinality of the union of any two sets.</p>
+<p><span class="math display">\[J(A,B) = \frac{|A \bigcap B|}{|A \bigcup B|}\]</span></p>
+<p>Note that this index will range from 0, for disjoint sets, to 1, for exactly equal sets.</p>
+<h3 id="if-we-were-to-scale">If we were to scale…</h3>
+<p>The advantadge of using n-gram sets is that we can use similarity-preserving summaries of those sets (eg. via <a href="https://en.wikipedia.org/wiki/MinHash">minhashing</a>) which, combined with <a href="https://en.wikipedia.org/wiki/Locality-sensitive_hashing">locality sensitive hashing</a> to efficiently compare pairs of sets provides a massively scalable solution. In this post we will just assume that the size of our data is small enought so that we do not need to scale.</p>
+<h2 id="the-code">The Code</h2>
+<p>All the above can be implemented in the following utility function, which will take an iterable of strings and the minimum jaccard similarity and max levenshtein distance to consider a pair a candidate for duplicity. It will return a pandas dataframe with the pair indices, their values, and their mutual Levenshtein and Jaccard distances. We will use the <a href="https://www.nltk.org/">Natural Languate Toolkit</a> for the implementation of those distances.</p>
+<p>Bear in mind that, in a real use case, we would very likely apply some normalization before testing for near duplicates (eg. to account for spaces and/or differences in upper/lowercase versions).</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">def</span> near_duplicates(factors, min_jaccard: <span class="bu">float</span>, max_levenshtein: <span class="bu">int</span>):</span>
+<span id="cb1-2"><a href="#cb1-2"></a>  trigrams <span class="op">=</span> [ <span class="bu">set</span>(<span class="st">&#39;&#39;</span>.join(g) <span class="cf">for</span> g <span class="kw">in</span> nltk.ngrams(f, <span class="dv">3</span>)) <span class="cf">for</span> f <span class="kw">in</span> factors ]</span>
+<span id="cb1-3"><a href="#cb1-3"></a>  jaccard <span class="op">=</span> <span class="bu">dict</span>()</span>
+<span id="cb1-4"><a href="#cb1-4"></a>  levenshtein <span class="op">=</span> <span class="bu">dict</span>()</span>
+<span id="cb1-5"><a href="#cb1-5"></a>  <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(factors)):</span>
+<span id="cb1-6"><a href="#cb1-6"></a>    <span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(i<span class="op">+</span><span class="dv">1</span>, <span class="bu">len</span>(factors)):</span>
+<span id="cb1-7"><a href="#cb1-7"></a>      denom <span class="op">=</span> <span class="bu">float</span>(<span class="bu">len</span>(trigrams[i] <span class="op">|</span> trigrams[j]))</span>
+<span id="cb1-8"><a href="#cb1-8"></a>      <span class="cf">if</span> denom <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb1-9"><a href="#cb1-9"></a>        jaccard[(i,j)] <span class="op">=</span> <span class="bu">float</span>(<span class="bu">len</span>(trigrams[i] <span class="op">&amp;</span> trigrams[j])) <span class="op">/</span> denom</span>
+<span id="cb1-10"><a href="#cb1-10"></a>      <span class="cf">else</span>:</span>
+<span id="cb1-11"><a href="#cb1-11"></a>        jaccard[(i,j)] <span class="op">=</span> np.NaN</span>
+<span id="cb1-12"><a href="#cb1-12"></a>      levenshtein[(i,j)] <span class="op">=</span> nltk.edit_distance(factors[i], factors[j])</span>
+<span id="cb1-13"><a href="#cb1-13"></a></span>
+<span id="cb1-14"><a href="#cb1-14"></a>  acum <span class="op">=</span> []</span>
+<span id="cb1-15"><a href="#cb1-15"></a>  <span class="cf">for</span> (i,j),v <span class="kw">in</span> jaccard.items():</span>
+<span id="cb1-16"><a href="#cb1-16"></a>    <span class="cf">if</span> v <span class="op">&gt;=</span> min_jaccard <span class="kw">and</span> levenshtein[(i,j)] <span class="op">&lt;=</span> max_levenshtein: </span>
+<span id="cb1-17"><a href="#cb1-17"></a>      acum.append([i,j,factors[i], factors[j], jaccard[(i,j)], levenshtein[(i,j)]])</span>
+<span id="cb1-18"><a href="#cb1-18"></a></span>
+<span id="cb1-19"><a href="#cb1-19"></a>  <span class="cf">return</span> pd.DataFrame(acum, columns<span class="op">=</span>[<span class="st">&#39;i&#39;</span>, <span class="st">&#39;j&#39;</span>, <span class="st">&#39;factor_i&#39;</span>, <span class="st">&#39;factor_j&#39;</span>, <span class="st">&#39;jaccard_ij&#39;</span>, <span class="st">&#39;levenshtein_ij&#39;</span>])</span></code></pre></div>
+<p>We can extend the above functions to explore a set of columns in a pandas data frame with the following code:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">def</span> df_dups(df, cols<span class="op">=</span><span class="va">None</span>, except_cols<span class="op">=</span>[], min_jaccard<span class="op">=</span><span class="fl">0.3</span>, max_levenshtein<span class="op">=</span><span class="dv">4</span>):</span>
+<span id="cb2-2"><a href="#cb2-2"></a>  acum <span class="op">=</span> []</span>
+<span id="cb2-3"><a href="#cb2-3"></a>  </span>
+<span id="cb2-4"><a href="#cb2-4"></a>  <span class="cf">if</span> cols <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb2-5"><a href="#cb2-5"></a>    cols <span class="op">=</span> df.columns</span>
+<span id="cb2-6"><a href="#cb2-6"></a></span>
+<span id="cb2-7"><a href="#cb2-7"></a>  <span class="cf">if</span> <span class="bu">isinstance</span>(min_jaccard, numbers.Number):</span>
+<span id="cb2-8"><a href="#cb2-8"></a>    mj <span class="op">=</span> defaultdict(<span class="kw">lambda</span> : min_jaccard)</span>
+<span id="cb2-9"><a href="#cb2-9"></a>  <span class="cf">else</span>:</span>
+<span id="cb2-10"><a href="#cb2-10"></a>    mj <span class="op">=</span> min_jaccard</span>
+<span id="cb2-11"><a href="#cb2-11"></a></span>
+<span id="cb2-12"><a href="#cb2-12"></a>  <span class="cf">if</span> <span class="bu">isinstance</span>(max_levenshtein, numbers.Number):</span>
+<span id="cb2-13"><a href="#cb2-13"></a>    ml <span class="op">=</span> defaultdict(<span class="kw">lambda</span>: max_levenshtein)</span>
+<span id="cb2-14"><a href="#cb2-14"></a>  <span class="cf">else</span>:</span>
+<span id="cb2-15"><a href="#cb2-15"></a>    ml <span class="op">=</span> max_levenshtein</span>
+<span id="cb2-16"><a href="#cb2-16"></a></span>
+<span id="cb2-17"><a href="#cb2-17"></a>  <span class="cf">for</span> c <span class="kw">in</span> cols:</span>
+<span id="cb2-18"><a href="#cb2-18"></a></span>
+<span id="cb2-19"><a href="#cb2-19"></a>    <span class="cf">if</span> c <span class="kw">in</span> except_cols <span class="kw">or</span> <span class="kw">not</span> is_string_dtype(df[c]):</span>
+<span id="cb2-20"><a href="#cb2-20"></a>      <span class="cf">continue</span></span>
+<span id="cb2-21"><a href="#cb2-21"></a></span>
+<span id="cb2-22"><a href="#cb2-22"></a>    factors <span class="op">=</span> df[c].factorize()[<span class="dv">1</span>]</span>
+<span id="cb2-23"><a href="#cb2-23"></a>    col_dups <span class="op">=</span> near_duplicates(factors, mj[c], ml[c])</span>
+<span id="cb2-24"><a href="#cb2-24"></a>    col_dups[<span class="st">&#39;col&#39;</span>] <span class="op">=</span> c</span>
+<span id="cb2-25"><a href="#cb2-25"></a>    acum.append(col_dups)</span>
+<span id="cb2-26"><a href="#cb2-26"></a></span>
+<span id="cb2-27"><a href="#cb2-27"></a>  <span class="cf">return</span> pd.concat(acum)</span></code></pre></div>
+<p>If we apply the above code to the open dataset from the <a href="http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html">last blog post</a></p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1"></a>df_dups(df, cols<span class="op">=</span>[<span class="st">&#39;Proveïdor&#39;</span>,</span>
+<span id="cb3-2"><a href="#cb3-2"></a>       <span class="st">&#39;Objecte del contracte&#39;</span>, </span>
+<span id="cb3-3"><a href="#cb3-3"></a>       <span class="st">&#39;Tipus Contracte&#39;</span>])</span></code></pre></div>
+<p>The column names are in Catalan since the dataset comes from the <a href="https://opendata-ajuntament.barcelona.cat/">Barcelona Council Open Data Hub</a>, and stand for the <em>contractor</em>, <em>the service descripction</em>, and the <em>type of service</em>.</p>
+<p>We get the following results:</p>
+<figure>
+<img src="/images/near_dups_menors.png" title="spiderman double" class="center" width="850" alt="" /><figcaption> </figcaption>
+</figure>
+<p>Notice that the first two are actually valid, despite being similar (two companies with similar names and <em>electric</em> vs <em>electronic</em> supplies), while the last two seem to be a case of not controlling the variable domain properly (singular/plural entries). We should definitely decide for a canonical value (singular/plural) for the column “Tipus Contracte” before we compute any aggregation for those columns.</p>
+<h2 id="conclusions">Conclusions</h2>
+<p>We can use the above functions as helpers prior to performing some analysis on datasets where domain rules have not been previously enforced. They are compatible with JupyterLite, so no need to install anything for the test. For convenience, you can find a working notebook <a href="https://gist.github.com/jarnaldich/24ece34b6fb441c3ef8878a39a265b82">in this gist</a>.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="http://www.mmds.org/">Mining Of Massive Datasets</a> - An absolute classic book. Chapter 3, in particular, describes a scalable improvement on the technique described in this blog post.</li>
+</ul>
+
+<div class="panel panel-default">
+    <div class="panel-body">
+        <div class="pull-left">
+            Tags: <a href="/tags/jupyterlite.html">jupyterlite</a>, <a href="/tags/data.html">data</a>, <a href="/tags/nltk.html">nltk</a>, <a href="/tags/jaccard.html">jaccard</a>, <a href="/tags/qc.html">qc</a>
+        </div>
+        <div class="social pull-right">
+            <span class="twitter">
+                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2023/03/19/near-duplicates.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
+            </span>
+
+             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+             <span>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
+             </span>
+            
+        </div>
+    </div>
+</div>
+
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+
+<div id="disqus_thread"></div>  
+<script type"text/javascript">
+      var disqus_shortname = 'jarnaldich';
+      (function() {
+          var dsq = document.createElement('script');
+          dsq.type = 'text/javascript';
+          dsq.async = true;
+          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+    
+]]></description>
+    <pubDate>Sun, 19 Feb 2023 00:00:00 UT</pubDate>
+    <guid>http://jarnaldich.me/blog/2023/03/19/near-duplicates.html</guid>
+    <dc:creator>Joan Arnaldich</dc:creator>
+</item>
+<item>
     <title>Dealing with CORS in JupyterLite</title>
     <link>http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html</link>
     <description><![CDATA[<h1>Dealing with CORS in JupyterLite</h1>
@@ -1218,118 +1403,6 @@
 ]]></description>
     <pubDate>Tue, 06 Jun 2017 00:00:00 UT</pubDate>
     <guid>http://jarnaldich.me/blog/2017/06/06/powershell-unix-philo.html</guid>
-    <dc:creator>Joan Arnaldich</dc:creator>
-</item>
-<item>
-    <title>Upserts in PosgreSQL</title>
-    <link>http://jarnaldich.me/blog/2015/08/26/upserts-in-postgresql.html</link>
-    <description><![CDATA[<h1>Upserts in PosgreSQL</h1>
-
-<small>Posted on August 26, 2015 <a href="/blog/2015/08/26/upserts-in-postgresql.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
-
-<p>Note: most of the content of this article is already in <a href="http://www.depesz.com/2012/06/10/why-is-upsert-so-complicated/">this blog post</a>, which is far more detailed. I’m just writing this for people who want to get directly to the solution and do not care for Perl code.</p>
-<h2 id="what-is-it">What is it?</h2>
-<p>As its name suggests, it is something that combines the functionality of an insert and an update.</p>
-<p>Like when:</p>
-<ol type="1">
-<li>You want to update a field of a record if it exists, or insert it with that field value if it does not.</li>
-<li>You have a process that inserts incrementally into a DB table, in which you may want to make sure that a certain record exists, and do not want to fail with a duplicate key error if it is already there (you are using the database as a <code>set</code> or <code>bag</code> data structure).</li>
-<li>A generalization of 1: you want to update a field of a record with a function of the old value (eg. incrementing), or assign it a default value if the record does not exist.</li>
-</ol>
-<h2 id="ok.-how-can-i-do-this">Ok. How can I do this?</h2>
-<p>Well, first thing is to check your PostgreSQL version. Versions 9.5 will have this functionality built-in (as many other RDBMS do) through the use of the <code>INSERT ... ON CONFLICT</code> clause. See the <a href="https://wiki.postgresql.org/wiki/UPSERT">discussion</a>.</p>
-<p>At the time of writing this, 9.5 is not available, and anyway many of us are forced to work with legacy versions, so here I will discuss a couple of ways to achive this functionality. Notice that geting this right is not easy, since concurrency and transaction issues must be taken into account. In particular, doing this in your code:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1"></a><span class="cf">if</span> (<span class="kw">SELECT</span> whatever <span class="kw">to</span> <span class="kw">check</span> <span class="cf">if</span> <span class="dt">record</span> <span class="kw">exists</span>)</span>
-<span id="cb1-2"><a href="#cb1-2"></a>    <span class="kw">UPDATE</span> it</span>
-<span id="cb1-3"><a href="#cb1-3"></a><span class="cf">else</span> </span>
-<span id="cb1-4"><a href="#cb1-4"></a>   <span class="kw">INSERT</span> IT</span></code></pre></div>
-<p>or alternatively,</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1"></a><span class="cf">if</span>(<span class="kw">UPDATE</span> affects one <span class="kw">or</span> more records) </span>
-<span id="cb2-2"><a href="#cb2-2"></a>  <span class="co">-- we&#39;re done</span></span>
-<span id="cb2-3"><a href="#cb2-3"></a><span class="cf">else</span> </span>
-<span id="cb2-4"><a href="#cb2-4"></a>  <span class="kw">INSERT</span> <span class="dt">record</span>;</span></code></pre></div>
-<p>Will not work even inside a transaction. The default isolation level for transactions will only guarantee that other connections do not see your intermediate changes and that all of your changes succed or fail at once. (That is, the A(tomic) and I(solated) in ACID). If two different transactions query the db concurrently for a new ID, they might both get the same ID, and the transaction will fail. Setting the transaction level to SERIALIZABLE would work (think of transactions running inside a mutual exclusion region), but the application code should be ready to retry the transaction.</p>
-<h2 id="the-general-solutions">The general solution(s)</h2>
-<p>So if you want a general solution that works for all of the 3 cases stated previously, you should probably write a stored procedure in the DB like the <a href="http://www.postgresql.org/docs/current/static/plpgsql-control-structures.html#PLPGSQL-UPSERT-EXAMPLE">documentation suggests</a>:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> db (a <span class="dt">INT</span> <span class="kw">PRIMARY</span> <span class="kw">KEY</span>, b TEXT);</span>
-<span id="cb3-2"><a href="#cb3-2"></a></span>
-<span id="cb3-3"><a href="#cb3-3"></a><span class="kw">CREATE</span> <span class="kw">FUNCTION</span> merge_db(<span class="kw">key</span> <span class="dt">INT</span>, <span class="kw">data</span> TEXT) RETURNS VOID <span class="kw">AS</span></span>
-<span id="cb3-4"><a href="#cb3-4"></a>$$</span>
-<span id="cb3-5"><a href="#cb3-5"></a><span class="cf">BEGIN</span></span>
-<span id="cb3-6"><a href="#cb3-6"></a>    <span class="cf">LOOP</span></span>
-<span id="cb3-7"><a href="#cb3-7"></a>        <span class="co">-- first try to update the key</span></span>
-<span id="cb3-8"><a href="#cb3-8"></a>        <span class="kw">UPDATE</span> db <span class="kw">SET</span> b <span class="op">=</span> <span class="kw">data</span> <span class="kw">WHERE</span> a <span class="op">=</span> <span class="kw">key</span>;</span>
-<span id="cb3-9"><a href="#cb3-9"></a>        <span class="cf">IF</span> found <span class="cf">THEN</span></span>
-<span id="cb3-10"><a href="#cb3-10"></a>            <span class="kw">RETURN</span>;</span>
-<span id="cb3-11"><a href="#cb3-11"></a>        <span class="cf">END</span> <span class="cf">IF</span>;</span>
-<span id="cb3-12"><a href="#cb3-12"></a>        <span class="co">-- not there, so try to insert the key</span></span>
-<span id="cb3-13"><a href="#cb3-13"></a>        <span class="co">-- if someone else inserts the same key concurrently,</span></span>
-<span id="cb3-14"><a href="#cb3-14"></a>        <span class="co">-- we could get a unique-key failure</span></span>
-<span id="cb3-15"><a href="#cb3-15"></a>        <span class="cf">BEGIN</span></span>
-<span id="cb3-16"><a href="#cb3-16"></a>            <span class="kw">INSERT</span> <span class="kw">INTO</span> db(a,b) <span class="kw">VALUES</span> (<span class="kw">key</span>, <span class="kw">data</span>);</span>
-<span id="cb3-17"><a href="#cb3-17"></a>            <span class="kw">RETURN</span>;</span>
-<span id="cb3-18"><a href="#cb3-18"></a>        <span class="kw">EXCEPTION</span> <span class="cf">WHEN</span> unique_violation <span class="cf">THEN</span></span>
-<span id="cb3-19"><a href="#cb3-19"></a>            <span class="co">-- Do nothing, and loop to try the UPDATE again.</span></span>
-<span id="cb3-20"><a href="#cb3-20"></a>        <span class="cf">END</span>;</span>
-<span id="cb3-21"><a href="#cb3-21"></a>    <span class="cf">END</span> <span class="cf">LOOP</span>;</span>
-<span id="cb3-22"><a href="#cb3-22"></a><span class="cf">END</span>;</span>
-<span id="cb3-23"><a href="#cb3-23"></a>$$</span>
-<span id="cb3-24"><a href="#cb3-24"></a>LANGUAGE plpgsql;</span>
-<span id="cb3-25"><a href="#cb3-25"></a></span>
-<span id="cb3-26"><a href="#cb3-26"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;david&#39;</span>);</span>
-<span id="cb3-27"><a href="#cb3-27"></a><span class="kw">SELECT</span> merge_db(<span class="dv">1</span>, <span class="st">&#39;dennis&#39;</span>);</span></code></pre></div>
-<p>This solution has the advantage of delegating db-specific code into the DB and simplifying the SQL queries on the application side.</p>
-<h3 id="other-options">Other options</h3>
-<ul>
-<li>Coding in the application instead of the DB. Doing the same in client code is trickier and depends on the language and database acess layer and involves the use of SAVEPOINTS .Again, check <a href="http://www.depesz.com/2012/06/10/why-is-upsert-so-complicated/">the original article</a> for a Perl example.</li>
-<li>Locking a table. It is safe but slow.</li>
-<li>Using <a href="http://www.postgresql.org/docs/current/interactive/explicit-locking.html#ADVISORY-LOCKS">advisory locks</a> will work and have good performance, but can lead to the same kind of problems that other in-process concurrency primitives (like mutexes, semaphores) have (eg. forgetting to acquire a lock). These problems could be minimized by a sound application db access layer.</li>
-</ul>
-<h2 id="partial-solutions">Partial solutions</h2>
-<p>If you know in advance that your process will not run concurrently, then all of the above can be greatly simplified. For example, if just want to make sure that a record exists in the db (and not fail with a duplicate key entry the second time), a combination of an INSERT and a SELECT will work, making use of the fact that INSERTS will accept a sub-SELECT instead of a VALUES clause:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> TEST (whatever, counter)</span>
-<span id="cb4-2"><a href="#cb4-2"></a>    <span class="kw">SELECT</span> <span class="dv">123</span>, <span class="dv">1</span> <span class="kw">WHERE</span> <span class="kw">NOT</span> <span class="kw">EXISTS</span> (<span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> test <span class="kw">WHERE</span> whatever <span class="op">=</span> <span class="dv">123</span>);</span></code></pre></div>
-<p>… that is more concise, but not that different from checking the DB state inside the application code.</p>
-<p><a href="http://www.the-art-of-web.com/sql/upsert/">see</a></p>
-
-<div class="panel panel-default">
-    <div class="panel-body">
-        <div class="pull-left">
-            Tags: <a href="/tags/sql.html">sql</a>, <a href="/tags/postgresql.html">postgresql</a>, <a href="/tags/upsert.html">upsert</a>
-        </div>
-        <div class="social pull-right">
-            <span class="twitter">
-                <a href="https://twitter.com/share" class="twitter-share-button" data-url="http://jarnaldich.me/blog/2015/08/26/upserts-in-postgresql.html" data-via="jarnaldich.me" data-dnt="true">Tweet</a>
-            </span>
-
-             <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
-             <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
-  size="medium"></g:plusone>
-             </span>
-            
-        </div>
-    </div>
-</div>
-
-<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
-
-<div id="disqus_thread"></div>  
-<script type"text/javascript">
-      var disqus_shortname = 'jarnaldich';
-      (function() {
-          var dsq = document.createElement('script');
-          dsq.type = 'text/javascript';
-          dsq.async = true;
-          dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
-          (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
-      })();
-</script>
-<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-    
-]]></description>
-    <pubDate>Wed, 26 Aug 2015 00:00:00 UT</pubDate>
-    <guid>http://jarnaldich.me/blog/2015/08/26/upserts-in-postgresql.html</guid>
     <dc:creator>Joan Arnaldich</dc:creator>
 </item>
 

@@ -3,23 +3,25 @@
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-        <title>Joan Arnaldich - Home</title>
+        <title>Joan Arnaldich - Near Duplicates Detection</title>
 
         <link rel="stylesheet" type="text/css" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
-        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css" rel="stylesheet">
+        <link href="//netdna.bootstrapcdn.com/font-awesome/4.0.1/css/font-awesome.css"
+              rel="stylesheet">
 
-        <link href="http://fonts.googleapis.com/css?family=Abel" rel="stylesheet" type="text/css">
+        <link href='http://fonts.googleapis.com/css?family=Abel' rel='stylesheet' type='text/css'>
 
 	<link href="https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Quicksand&display=swap" rel="stylesheet">
 
-	<link rel="stylesheet" type="text/css" href="./css/syntax.css" />
-        <link rel="stylesheet" type="text/css" href="./css/custom.css" />
-        <link rel="stylesheet" type="text/css" href="./css/prism.css" />
+	<link rel="stylesheet" type="text/css" href="/css/syntax.css" />
+        <link rel="stylesheet" type="text/css" href="/css/custom.css" />
+        <link rel="stylesheet" type="text/css" href="/css/prism.css" />
     </head>
     <body>
-<script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-	<script src="./js/prism.js"></script>
+<script type="text/javascript" async
+        src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<script src="/js/prism.js"></script>
         <div class="container">
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -29,14 +31,14 @@
 
                         <div style="margin-top:20px;">
                             <div class="row">
-                                <div class="col-md-2"><a href="./"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
+                                <div class="col-md-2"><a href="/"><i class="fa fa-home fa-lg fa-fw"></i> Home</a></div>
 
-                                <div class="col-md-2"><a href="./posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
-                                <div class="col-md-2"><a href="./tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
-                                <div class="col-md-2"><a href="./about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
+                                <div class="col-md-2"><a href="/posts.html"><i class="fa fa-pencil fa-lg fa-fw"></i> Posts</a></div>
+                                <div class="col-md-2"><a href="/tags.html"><i class="fa fa-tag fa-lg fa-fw"></i> Tags</a></div>
+                                <div class="col-md-2"><a href="/about.html"><i class="fa fa-male fa-lg fa-fw"></i> About</a></div>
                                 <div class="col-xs-1"><a href="http://github.com/jarnaldich"><i class="fa fa-github fa-lg fa-fw"></i></a></div>
                                 <div class="col-xs-1"><a href="https://twitter.com/jarnaldich"><i class="fa fa-twitter fa-lg fa-fw"></i></a></div>
-                                <div class="col-xs-1"><a href="./rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
+                                <div class="col-xs-1"><a href="/rss.xml"><i class="fa fa-rss fa-lg fa-fw"></i></a></div>
                             </div>
                         </div>
                     </div>
@@ -46,12 +48,12 @@
                 <div class="col-md-10 col-md-offset-1">
                     <h1>Near Duplicates Detection</h1>
 
-<small>Posted on February 19, 2023 <a href="./blog/2023/03/19/near-duplicates.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
+<small>Posted on February 19, 2023 <a href="/blog/2023/03/19/near-duplicates.html"><i class="fa fa-link fa-lg fa-fw"></i></a></small>
 
 <p>In my <a href="http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html">previous post</a> I set up a tool to ease the download of open datasets into a JupyterLite environment, which is a neat tool to perform simplish data wrangling without local installation.</p>
 <p>In this post we will put that tool to good use for one of the most common data cleaning utilities: near duplicate detection.</p>
 <figure>
-<img src="./images/spiderman_double.png" title="spiderman double" class="center" alt /><figcaption> </figcaption>
+<img src="/images/spiderman_double.png" title="spiderman double" class="center" alt="" /><figcaption> </figcaption>
 </figure>
 <h2 id="why-bother-about-near-duplicates">Why bother about near duplicates?</h2>
 <p>Near duplicates can be a sign of a poor schema implementation, especially when they appear in variables with finite domains (factors). For example, in the following addresses dataset:</p>
@@ -88,7 +90,7 @@
 </tbody>
 </table>
 </center>
-<p></p>
+<p/>
 <p>The “kind” variable could predictably take any of the following values:</p>
 <ul>
 <li>road</li>
@@ -123,7 +125,7 @@
 <p>All the above can be implemented in the following utility function, which will take an iterable of strings and the minimum jaccard similarity and max levenshtein distance to consider a pair a candidate for duplicity. It will return a pandas dataframe with the pair indices, their values, and their mutual Levenshtein and Jaccard distances. We will use the <a href="https://www.nltk.org/">Natural Languate Toolkit</a> for the implementation of those distances.</p>
 <p>Bear in mind that, in a real use case, we would very likely apply some normalization before testing for near duplicates (eg. to account for spaces and/or differences in upper/lowercase versions).</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1"></a><span class="kw">def</span> near_duplicates(factors, min_jaccard: <span class="bu">float</span>, max_levenshtein: <span class="bu">int</span>):</span>
-<span id="cb1-2"><a href="#cb1-2"></a>  trigrams <span class="op">=</span> [ <span class="bu">set</span>(<span class="st">''</span>.join(g) <span class="cf">for</span> g <span class="kw">in</span> nltk.ngrams(f, <span class="dv">3</span>)) <span class="cf">for</span> f <span class="kw">in</span> factors ]</span>
+<span id="cb1-2"><a href="#cb1-2"></a>  trigrams <span class="op">=</span> [ <span class="bu">set</span>(<span class="st">&#39;&#39;</span>.join(g) <span class="cf">for</span> g <span class="kw">in</span> nltk.ngrams(f, <span class="dv">3</span>)) <span class="cf">for</span> f <span class="kw">in</span> factors ]</span>
 <span id="cb1-3"><a href="#cb1-3"></a>  jaccard <span class="op">=</span> <span class="bu">dict</span>()</span>
 <span id="cb1-4"><a href="#cb1-4"></a>  levenshtein <span class="op">=</span> <span class="bu">dict</span>()</span>
 <span id="cb1-5"><a href="#cb1-5"></a>  <span class="cf">for</span> i <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(factors)):</span>
@@ -140,7 +142,7 @@
 <span id="cb1-16"><a href="#cb1-16"></a>    <span class="cf">if</span> v <span class="op">&gt;=</span> min_jaccard <span class="kw">and</span> levenshtein[(i,j)] <span class="op">&lt;=</span> max_levenshtein: </span>
 <span id="cb1-17"><a href="#cb1-17"></a>      acum.append([i,j,factors[i], factors[j], jaccard[(i,j)], levenshtein[(i,j)]])</span>
 <span id="cb1-18"><a href="#cb1-18"></a></span>
-<span id="cb1-19"><a href="#cb1-19"></a>  <span class="cf">return</span> pd.DataFrame(acum, columns<span class="op">=</span>[<span class="st">'i'</span>, <span class="st">'j'</span>, <span class="st">'factor_i'</span>, <span class="st">'factor_j'</span>, <span class="st">'jaccard_ij'</span>, <span class="st">'levenshtein_ij'</span>])</span></code></pre></div>
+<span id="cb1-19"><a href="#cb1-19"></a>  <span class="cf">return</span> pd.DataFrame(acum, columns<span class="op">=</span>[<span class="st">&#39;i&#39;</span>, <span class="st">&#39;j&#39;</span>, <span class="st">&#39;factor_i&#39;</span>, <span class="st">&#39;factor_j&#39;</span>, <span class="st">&#39;jaccard_ij&#39;</span>, <span class="st">&#39;levenshtein_ij&#39;</span>])</span></code></pre></div>
 <p>We can extend the above functions to explore a set of columns in a pandas data frame with the following code:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1"></a><span class="kw">def</span> df_dups(df, cols<span class="op">=</span><span class="va">None</span>, except_cols<span class="op">=</span>[], min_jaccard<span class="op">=</span><span class="fl">0.3</span>, max_levenshtein<span class="op">=</span><span class="dv">4</span>):</span>
 <span id="cb2-2"><a href="#cb2-2"></a>  acum <span class="op">=</span> []</span>
@@ -165,18 +167,18 @@
 <span id="cb2-21"><a href="#cb2-21"></a></span>
 <span id="cb2-22"><a href="#cb2-22"></a>    factors <span class="op">=</span> df[c].factorize()[<span class="dv">1</span>]</span>
 <span id="cb2-23"><a href="#cb2-23"></a>    col_dups <span class="op">=</span> near_duplicates(factors, mj[c], ml[c])</span>
-<span id="cb2-24"><a href="#cb2-24"></a>    col_dups[<span class="st">'col'</span>] <span class="op">=</span> c</span>
+<span id="cb2-24"><a href="#cb2-24"></a>    col_dups[<span class="st">&#39;col&#39;</span>] <span class="op">=</span> c</span>
 <span id="cb2-25"><a href="#cb2-25"></a>    acum.append(col_dups)</span>
 <span id="cb2-26"><a href="#cb2-26"></a></span>
 <span id="cb2-27"><a href="#cb2-27"></a>  <span class="cf">return</span> pd.concat(acum)</span></code></pre></div>
 <p>If we apply the above code to the open dataset from the <a href="http://jarnaldich.me/blog/2023/01/29/jupyterlite-jsonp.html">last blog post</a></p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1"></a>df_dups(df, cols<span class="op">=</span>[<span class="st">'Proveïdor'</span>,</span>
-<span id="cb3-2"><a href="#cb3-2"></a>       <span class="st">'Objecte del contracte'</span>, </span>
-<span id="cb3-3"><a href="#cb3-3"></a>       <span class="st">'Tipus Contracte'</span>])</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1"></a>df_dups(df, cols<span class="op">=</span>[<span class="st">&#39;Proveïdor&#39;</span>,</span>
+<span id="cb3-2"><a href="#cb3-2"></a>       <span class="st">&#39;Objecte del contracte&#39;</span>, </span>
+<span id="cb3-3"><a href="#cb3-3"></a>       <span class="st">&#39;Tipus Contracte&#39;</span>])</span></code></pre></div>
 <p>The column names are in Catalan since the dataset comes from the <a href="https://opendata-ajuntament.barcelona.cat/">Barcelona Council Open Data Hub</a>, and stand for the <em>contractor</em>, <em>the service descripction</em>, and the <em>type of service</em>.</p>
 <p>We get the following results:</p>
 <figure>
-<img src="./images/near_dups_menors.png" title="spiderman double" class="center" width="850" alt /><figcaption> </figcaption>
+<img src="/images/near_dups_menors.png" title="spiderman double" class="center" width="850" alt="" /><figcaption> </figcaption>
 </figure>
 <p>Notice that the first two are actually valid, despite being similar (two companies with similar names and <em>electric</em> vs <em>electronic</em> supplies), while the last two seem to be a case of not controlling the variable domain properly (singular/plural entries). We should definitely decide for a canonical value (singular/plural) for the column “Tipus Contracte” before we compute any aggregation for those columns.</p>
 <h2 id="conclusions">Conclusions</h2>
@@ -189,7 +191,7 @@
 <div class="panel panel-default">
     <div class="panel-body">
         <div class="pull-left">
-            Tags: <a href="./tags/jupyterlite.html">jupyterlite</a>, <a href="./tags/data.html">data</a>, <a href="./tags/nltk.html">nltk</a>, <a href="./tags/jaccard.html">jaccard</a>, <a href="./tags/qc.html">qc</a>
+            Tags: <a href="/tags/jupyterlite.html">jupyterlite</a>, <a href="/tags/data.html">data</a>, <a href="/tags/nltk.html">nltk</a>, <a href="/tags/jaccard.html">jaccard</a>, <a href="/tags/qc.html">qc</a>
         </div>
         <div class="social pull-right">
             <span class="twitter">
@@ -198,7 +200,8 @@
 
              <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
              <span>
-                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/" size="medium"></g:plusone>
+                <g:plusone href="http://www.example.com/blog/2013/12/14/parallel-voronoi-in-haskell/"
+  size="medium"></g:plusone>
              </span>
             
         </div>
@@ -208,7 +211,7 @@
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
 
 <div id="disqus_thread"></div>  
-<script type"text javascript">
+<script type"text/javascript">
       var disqus_shortname = 'jarnaldich';
       (function() {
           var dsq = document.createElement('script');
@@ -220,7 +223,6 @@
 </script>
 <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
     
-
 
                 </div>
             </div>
