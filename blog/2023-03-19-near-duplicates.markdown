@@ -63,7 +63,7 @@ values, depending on the underlying data infrastructure:
   sideways anyway, so in this scenario you should consider performing periodic
   schema validation tests on the data.
 
-Notice that both of these solutions require _a priori_ knowledge of the domain.
+Notice that all of these solutions require _a priori_ knowledge of the domain.
 
 But what happens when we are faced with an (underdocumented) dataset and asked
 to use it as a source for analysis? Or when we are asked to derive these rules
